@@ -1,0 +1,80 @@
+#nowLoading {
+  display: table;
+  width: 100%;
+  height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  background-color: #fff;
+  opacity: 0.8;
+}
+
+#innerMsg {
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+  padding-top: 140px;
+  z-index: 100;
+  background: url("ローディング.gif") center center no-repeat;
+}
+
+#input_text {
+  /* 横幅 */
+  width: 95%;
+  /* 高さ */
+  height: 150px;
+}
+
+#result_category {
+  /* 横幅 */
+  width: 95%;
+}
+
+#result_div {
+  /* 横幅 */
+  width: 95%;
+}
+
+main div {
+  margin: 0;
+  /* 要素の外側の余白を0に定義 */
+  padding: 0;
+  /* 要素の内側の余白を0に定義 */
+}
+
+.left-column0 {
+
+  float: left;
+
+  width: 12%;
+}
+
+
+.left-column {
+
+  float: left;
+
+  width: 45%;
+  /* 要素の幅を50%に定義 */
+}
+
+.right-column {
+
+  float: right;
+
+  width: 50%;
+  /* 要素の幅を50%に定義 */
+}
+
+.left-column2 {
+
+  float: left;
+
+}
+
+.right-column2 {
+
+  float: right;
+
+  width: 25%;
+}

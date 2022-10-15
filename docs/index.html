@@ -1,12 +1,599 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
-    <meta charset="UTF-8">
-    <title>GitHubPages Sample</title>
+	<link rel="stylesheet" href="jscss/main.css">
+	<link rel="stylesheet" href="jscss/checkbox_tree.css">
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta http-equiv="X-UA-Compatible" content="ie=edge">
+	<script src="./jscss/kuromoji.js"></script>
+	<script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+	<script type="text/javascript" src="./jscss/sparql.js" charset="UTF-8"></script>
+	<script src="./jscss/dbpedia_category.js"></script>
+	<script src="./jscss/categorylist_color.js"></script>
+	<title>Media Wiki APIを用いたアノテーションシステム</title>
+
+	<script>
+		/*ローカルで行う場合、クローム起動時に
+		    
+		DPC
+		"C:\Program Files\Google\Chrome\Application\chrome.exe" --allow-file-access-from-files
+
+		NPC
+		"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --allow-file-access-from-files
+	
+		でコマンドで起動が必要！*/
+
+		//kuromoji必要変数
+		const ids = [];
+		const names = [];
+		const DICT_PATH = "./dict";
+
+		//サーチAPIの結果取得上限数
+		var APIlimit = 10;
+
+
+		const keylink = "item";	//リンクのkeyとする変数
+		const detail_html = "details.html"; //詳細表示用のHTMLファイル
+		detailsType = "window";//詳細表示の表示先("window":別Window，"iframe":iframeで同一画面，"blank":別タブ)
+		isShowQuery = true;//「クエリ表示」ボタンを表示するか？（サービス公開時はfalseにするとよい）
+
+		window.addEventListener('load', () => {
+			const anotateButton = document.getElementById('anotate');
+			//検索結果のカテゴリー表示エリア
+			const resultArea0 = document.getElementById('result_category');
+			//アノテーション後のテキスト表示エリア
+			const resultArea1 = document.getElementById('result_div');
+			//wikidata埋め込み用表示エリア
+			const resultArea2 = document.getElementById('result_div_wiki');
+			//カテゴリーチェックボックス階層
+			const CATcheckbox = document.getElementsByClassName('hierarchy0');
+
+			//console.log("DBペディアカテゴリー", dbpedia_categorylist);
+			//console.log("カテゴリー0階層目",CATcheckbox);
+
+			anotateButton.addEventListener('click', () => {
+				//アノテーションテキスト入出力
+				var textINPUT = document.getElementById('input_text').value;
+				var textOUTPUT = '';
+
+				//ウィキデータ系の総合ログ
+				var wikidata_log = new Array();
+				//フィルタリング後の形態素解析結果
+				var words = new Array();
+				//リンクテキスト
+				var linked_string = new Array();
+				//API検索結果のカテゴリ一覧
+				var searched_category = new Array();
+
+				//詳細設定ラジオボタン
+				const select_noun = radio_value('radio_noun');
+				const searchtype = radio_value('labelType');
+
+				// Loading 画像を表示
+				dispLoading("処理中...");
+
+				async function main() {
+					//カテゴリーチェックボックス結果
+					var checklist = new Map();
+					var matchlist = new Map();
+					for (let i = 0; i < CATcheckbox.length; i++) {
+						//console.log(CATcheckbox[i]);
+						if (CATcheckbox[i].checked) {
+							checklist.set(CATcheckbox[i].id, CATcheckbox[i].value);
+
+							let j = 0;
+							while (true) {
+								let CATcheckbox1 = document.getElementById('cat-' + i + '-' + j);
+								if (CATcheckbox1 != null) {
+									if (CATcheckbox1.checked) {
+										checklist.delete(CATcheckbox[i].id);
+										checklist.set(CATcheckbox1.id, CATcheckbox1.value);
+									}
+									j++;
+								} else {
+									break;
+								}
+							}
+						}
+					}
+					console.log(checklist);
+					for (let db of dbpedia_categorylist) {
+						for (let val of checklist.values()) {
+							if (db.clsLabel.value == val) {
+								matchlist.set(val, db.o.value);
+							}
+						}
+					}
+					console.log(matchlist);
+
+
+					//kuoromoji形態素解析結果の格納
+					var tokens = await promise_analysis(textINPUT);
+
+					tokens.forEach((token) => {// 解析結果を順番に取得する
+						if (select_noun == "u_noun") {
+							if (token.pos_detail_1 == "固有名詞") {
+								//固有名詞を抽出
+								words.push(token);
+							}
+						} else {
+							if (token.pos == "名詞") {
+								//名詞を抽出
+								words.push(token);
+							}
+						}
+					});
+
+					//ブラックリストかホワイトリストを使用するか判定
+					if (select_noun == 'noun_w' || select_noun == 'noun_b') {
+						const nounvalue = document.getElementById(select_noun).value;
+						const nounlist = nounvalue.split(',');
+
+						if (select_noun == 'noun_w') {
+							words = match_whitelist(nounlist, words);
+						} else if (select_noun == 'noun_b') {
+							words = match_blacklist(nounlist, words);
+						}
+					}
+
+					var linked_string = new Array();
+					var query_data;
+					for (let i = 0; i < words.length; i++) {
+						//検索対象のwikidataid
+						var wikidata_ids = '';
+						let name, info;
+
+						if (searchtype == "forward") {
+
+							//前方一致でAPIでwikidataに問い合わせ
+							let APIresponse = await promise_get_action_wbsearchentities(words[i].surface_form, APIlimit);
+							console.log("サーチAPI結果(前方一致)", APIresponse);
+							let name = APIresponse.searchinfo.search;
+							let info = APIresponse.search;
+
+
+							//ログを蓄積
+							wikidata_log.push([name, info]);
+
+							//APIの結果を整形し、SPARQLで問い合わせ
+							if (info.length !== 0) {
+								if (Array.from(checklist.entries()).length != 0) {
+
+									//sparqlqeryの生成、問い合わせ
+									for (let j = 0; j < info.length; j++) {
+										wikidata_ids += "wd:" + info[j].id + " ";
+									}
+									query_data = await sparql_query(wikidata_ids);
+									console.log("クエリの結果", query_data);
+									console.log(Array.from(checklist.entries()).length);
+
+									//カテゴリーにマッチしたwikidataidと色の対応
+									let s_cat = select_category(query_data, checklist, matchlist);
+									//console.log(Array.isArray(s_cat[0]));
+									if (s_cat[0] !== undefined) {
+										wikidata_log[i].push(create_category(searched_category, query_data));
+										//リンクテキストの生成
+										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+											+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "") + '" target="_blank" style ="background:'
+											+ s_cat[1] + '">' + name + '</a></b>']);
+									} else {
+										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+											+ info[0].title + '" target="window">' + name + '</a></b>']);
+									}
+
+								} else {
+									await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+										+ info[0].id + '" target="window">' + name + '</a></b>']);
+								}
+
+							}
+						} else if (searchtype == "ambi") {
+							//前方一致でAPIでwikidataに問い合わせ
+							let APIresponse = await promise_get_list_search(words[i].surface_form, APIlimit)
+							console.log("サーチAPI結果(あいまい)対象:" + words[i].surface_form, APIresponse.query);
+							let name = words[i].surface_form;
+							let info = APIresponse.query.search;
+
+							//ログを蓄積
+							wikidata_log.push([name, info]);
+
+							//APIの結果を整形し、SPARQLで問い合わせ
+							if (info.length !== 0) {
+								if (Array.from(checklist.entries()).length != 0) {
+
+									//sparqlqeryの生成、問い合わせ
+									for (let j = 0; j < info.length; j++) {
+										wikidata_ids += "wd:" + info[j].title + " ";
+									}
+									query_data = await sparql_query(wikidata_ids);
+									console.log("クエリの結果", query_data);
+									//カテゴリーにマッチしたwikidataidと色の対応
+									let s_cat = select_category(query_data, checklist, matchlist);
+									//console.log(Array.isArray(s_cat[0]));
+									if (s_cat[0] !== undefined) {
+
+										wikidata_log[i].push(create_category(searched_category, query_data));
+										//リンクテキストの生成
+										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+											+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
+											+ '" target="_blank" style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
+									} else {
+										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+											+ info[0].title + '" target="_blank">' + name + '</a></b>']);
+									}
+								} else {
+									await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
+										+ info[0].title + '" target="_blank">' + name + '</a></b>']);
+								}
+							}
+						}
+
+					}
+					console.log('wikidata検索結果', wikidata_log);
+					console.log('置き換えられた単語', linked_string);
+
+
+
+					for (let i = 0; i < tokens.length; i++) {
+						const judge = linked_string.some(data => data.indexOf(tokens[i].surface_form) != -1);
+						//console.log(judge);
+						if (judge === true) {
+							//console.log(tokens[i].surface_form)
+							for (let j = 0; j < linked_string.length; j++) {
+								if (linked_string[j][0] == tokens[i].surface_form) {
+									textOUTPUT += linked_string[j][1] + ' ';
+									break;
+								}
+							}
+						} else if (judge == false) {
+							textOUTPUT += tokens[i].surface_form;
+						}
+					}
+
+					// Loading 画像を消す
+					removeLoading();
+					resultArea0.innerHTML = '<H2>カテゴリー</H2>' + searched_category;
+
+					/*
+					for (let i = 0; i < wikidata_log.length; i++) {
+						for (let j of wikidata_log[i][2]) {
+							resultArea0.innerHTML += j + ', ';
+						}
+					}*/
+					resultArea1.innerHTML = '<H2>アノテーション結果</H2>' + textOUTPUT;
+					//resultArea2.innerHTML = '<iframe id="kg" name="kg" width=450" height="600" ></iframe>';
+					return resultArea1;
+				}
+				main();
+
+			}, false);
+		}, false);
+
+		//カテゴリーチェック関数()
+
+		//kuromoji形態素解析(解析文章)
+		function promise_analysis(text) {
+			return new Promise((resolve) => {
+				// Kuromoji
+				kuromoji.builder({ dicPath: DICT_PATH }).build((err, tokenizer) => {
+					const tokens = tokenizer.tokenize(text);// 解析データの取得
+					console.log("形態素解析結果", tokens);
+
+					//console.log(words);
+					return resolve(tokens);
+				});
+			});
+		}
+
+		//mediawiki_API 前方一致(検索ワード,結果取得上限数)
+		function promise_get_action_wbsearchentities(word, limit) {
+			return new Promise((resolve) => {
+
+				let urlw = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" + word + "&limit=" + limit + "&language=ja&format=json&origin=*";
+				fetch(urlw)
+					.then(function (response) { return resolve(response.json()); })
+					.catch(function (error) { console.log(error); });
+			})
+		}
+
+		//wikibase_API あいまい(検索ワード,結果取得上限数)
+		function promise_get_list_search(word, limit) {
+			return new Promise((resolve) => {
+				let urlw = "https://www.wikidata.org/w/api.php?action=query&list=search&srsearch=" + word + "&srlimit=" + limit + "&sroffset=0&format=json&origin=*";
+				fetch(urlw)
+					.then(function (response) { return resolve(response.json()); })
+					.catch(function (error) { console.log(error); });
+			})
+		}
+
+		//カテゴリー選択関数
+		function select_category(query_data, checklist, matchlist,) {
+			let purpose_id = new Array();
+			let color = new Array();
+
+			for (let q of query_data) {
+				//console.log(q);
+				let idx1 = Array.from(matchlist.values()).indexOf(q.o.value);
+
+				if (idx1 != -1) {
+					console.log(Array.from(matchlist.values()));
+					console.log(q);
+					//console.log(idx1);
+
+					purpose_id.push(q);
+					let idx2 = Array.from(checklist.values()).indexOf(Array.from(matchlist.entries())[idx1][0]);
+					reg = new RegExp("cat-\d(-\d)+", "g");
+
+					if (idx2 != -1) {
+						//console.log(Array.from(checklist.values()));
+						//console.log(Array.from(matchlist.entries())[idx1][0]);
+						//console.log(idx2);
+
+						let tmp;
+						if (reg.test(Array.from(checklist.entries())[idx2][0])) {
+							let tmp1 = Array.from(checklist.entries())[idx2][0].slice(5);
+							tmp = Array.from(checklist.entries())[idx2][0].replace(tmp1, "");
+						} else {
+							tmp = Array.from(checklist.entries())[idx2][0];
+						}
+						let idx3 = Object.keys(category_color).indexOf(tmp);
+						color.push(category_color['cat-' + idx3]);
+
+						//console.log(Array.from(checklist.entries())[idx2][0]);
+						//console.log(idx3);
+						//console.log(category_color);
+						//console.log(category_color['cat-' + idx3]);
+					}
+				}
+			}
+			console.log(purpose_id);
+			console.log(color);
+			let res = [purpose_id[0], color[0]];
+
+			return res;
+		}
+
+		//wikidata sparql endpoint(wikidataID:Q???)
+		function sparql_query(ids) {
+			return new Promise((resolve) => {
+				//SPARQLエンドポイントの初期設定
+				var endpoint = "https://query.wikidata.org/sparql";
+
+				//SPARQLクエリの発行
+				//idsにsearchAPIで返ってきた「Q???」を全て代入
+				var query = 'PREFIX wdt: <http://www.wikidata.org/prop/direct/> \n'
+					+ 'PREFIX wd: <http://www.wikidata.org/entity/> \n'
+					+ 'select  DISTINCT ?s ?sLabel ?o ?oLabel \n'
+					+ 'where{ \n'
+					+ 'VALUES ?s {' + ids + '} \n'
+					+ '?s wdt:P31/wdt:P279* ?o.  \n'
+					+ 'SERVICE wikibase:label { bd:serviceParam wikibase:language "ja,en". }\n'
+					+ '}'
+				//console.log(query)
+
+				//SPARQLクエリの実行（sparql.jsで定義している関数を利用）
+				qr = sendQuery(endpoint, query);
+
+				qr.fail(//クエリが失敗したときの処理
+					function (xhr, textStatus, thrownError) {
+						//alert("Error: A '" + textStatus + "' occurred.");
+					}
+				);
+				qr.done(//クエリが成功したときの処理
+					function (d) {
+						//console.log(d);
+						return resolve(d.results.bindings);
+					}
+				);
+			})
+
+		}
+
+		//検索結果カテゴリー作成用関数(サーチ後のカテゴリ一覧,sparqlqerydata)
+		function create_category(category, data) {
+			//下のコードでサーチ後のカテゴリー作成
+			let OLABEL = new Array();
+			for (let j = 0; j < data.length; j++) {
+				OLABEL.push(data[j].oLabel.value);
+				if (category.indexOf(data[j].oLabel.value) == -1) {
+					category.push(data[j].oLabel.value);
+				}
+			}
+			return OLABEL;
+		}
+
+
+		//ブラックリストの照会をして、削除したものを返す(ブラックリスト,形態素解析結果（名詞）)
+		function match_blacklist(blacklist, target) {
+			for (let i = 0; i < blacklist.length; i++) {
+				for (let j = 0; j < target.length; j++) {
+					if (blacklist[i] === target[j].pos_detail_1) {
+						//console.log(target[j]);
+						target.splice(j, 1);
+					}
+				}
+			}
+			console.log("wikidata検索ワード", target);
+			return target;
+		}
+
+		//ホワイトリストの照会をして、削除したものを返す(ホワイトリスト,形態素解析結果（名詞）)
+		function match_whitelist(whitelist, target) {
+			let list = new Array();
+			for (let i = 0; i < whitelist.length; i++) {
+				for (let j = 0; j < target.length; j++) {
+					if (whitelist[i] === target[j].pos_detail_1) {
+						list.push(target[j]);
+					}
+				}
+			}
+			console.log("wikidata検索ワード", list);
+			return list;
+		}
+
+		//詳細設定のラジオボタン値取得(ラジオボタン名)
+		function radio_value(name) {
+			let elements = document.getElementsByName(name);
+			let len = elements.length;
+			let checkValue = '';
+
+			for (let i = 0; i < len; i++) {
+				if (elements.item(i).checked) {
+					checkValue = elements.item(i).value;
+					return checkValue;
+				}
+			}
+		}
+
+		//整形し、結果画面の文章を出力(形態素解析結果,リンクテキスト)
+		function resultOUTPUT(tokens, linked_string) {
+			let j = 0;
+			let output = '';
+			for (let i = 0; i < tokens.length; i++) {
+				if (tokens[i].surface_form == linked_string[j][0]) {
+					output += linked_string[j][1];
+					if (j < linked_string.length) {
+						j++;
+					}
+					continue;
+				} else if (tokens.surface_form != linked_string[j][0]) {
+					output += tokens[i].surface_form;
+				}
+			}
+			return output;
+		}
+
+		//ローディング画面用の関数
+		function dispLoading(msg) {
+			// 引数なしの場合、メッセージは非表示。
+			if (msg === undefined) msg = "";
+
+			// 画面表示メッセージを埋め込み
+			var innerMsg = "<div id='innerMsg'>" + msg + "</div>";
+
+			// ローディング画像が非表示かどうかチェックし、非表示の場合のみ出力。
+			if ($("#nowLoading").length == 0) {
+				$("body").append("<div id='nowLoading'>" + innerMsg + "</div>");
+			}
+		}
+
+		//表示ストップ用の関数
+		function removeLoading() {
+			$("#nowLoading").remove();
+		}
+
+		//ボタンの動的生成用関数
+		function create_button(label) {
+			$(document).ready(function () {
+				$('#container').append('<input type="button" id="submit" value=' + label + ' class="btn">');
+			});
+		}
+
+	</script>
 </head>
+
 <body>
-    <h1>瀬野匡史のサンプルページ</h1>
-    <hr>
-    GitHubPagesのテスト用に作成したページです
+	<h1>Media Wiki APIを用いたアノテーションシステム</h1>
+	<hr>
+	<main>
+		<div class="left-column0">
+			<ul class="treeview">
+				<b>カテゴリー</b>:<br>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-0" value="activity">
+					<label for="cat-0" style="background:red" #>活動</label>
+					<ul>
+						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-0" value="game">
+							<label for="cat-0-0" style="background:red">ゲーム</label>
+						</li>
+						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-1" value="sport">
+							<label for="cat-0-1" style="background:red">スポーツ</label>
+						</li>
+					</ul>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-1"
+						value="class of anatomical entity"> <label for="cat-1"
+						style="background:lightslategray">解剖学的構造</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-2" value="disease">
+					<label for="cat-2" style="background:green">疾患</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-3" value="drug"> <label
+						for="cat-3" style="background:yellow">薬</label></li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-4" value="organisation"> <label
+						for="cat-4" style="background:purple">組織</label></li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-5" value="person">
+					<label for="cat-5" style="background:orange">人物</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-6" value="place">
+					<label for="cat-6" style="background:brown">場所</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-7" value="chemical substance">
+					<label for="cat-7" style="background:aqua">化学物質</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-8" value="species">
+					<label for="cat-8" style="background:lime">種</label>
+				</li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-9" value="work">
+					<label for="cat-9" style="background:pink">仕事</label>
+				</li>
+			</ul>
+		</div>
+
+		<div class="left-column">
+			<details>
+				<summary><b>詳細設定</b></summary>
+				<div class="left-column">
+					<p>
+						<b>ラベルの検索設定</b>:<br>
+						<label><input type="radio" id="LabelForward" name="labelType" value="forward"
+								checked>前方一致</label>
+						<label><input type="radio" id="LabelAmbi" name="labelType" value="ambi">あいまい検索</label><br><br>
+						<b>品詞の選択</b>:<br>
+						<input type="radio" name="radio_noun" value="u_noun">固有名詞のみ<br>
+						<input type="radio" name="radio_noun" value="noun">名詞のみ<br>
+						<input type="radio" name="radio_noun" value="noun_w" checked>名詞ホワイトリスト<br><input type="text"
+							id="noun_w" size="40" value="固有名詞,一般"><br>
+						<input type="radio" name="radio_noun" value="noun_b">名詞ブラックリスト<br><input type="text" id="noun_b"
+							size="40" value="数,代名詞,非自立,形容動詞語幹,副詞可能"><br>
+					</p>
+				</div>
+
+			</details>
+			<textarea id="input_text">
+オキシトシン（OXT）は、視床下部で産生される神経ペプチドです。OXT産生ニューロンは軸索を神経下垂体後葉、
+つまり下垂体後葉に投射し、ペプチドホルモンとして末梢的にOXTを血液循環に放出します。これらのニューロン
+はまた、いくつかの脳領域を神経支配し、そこで神経ペプチドとしてOXTを放出します。したがって、OXTは、子宮
+収縮や授乳などの末梢性機能だけでなく、社会的、攻撃的、恐怖、母性行動などの中枢性機能の調節にも関与して
+います。
+	</textarea>
+			<br>
+			<button id="anotate">アノテーション実行</button>
+			<div id="container"></div>
+			<div style="display:none">
+				<div id="result_category"></div>
+			</div>
+			<div id="result_div"></div>
+		</div>
+		<div class="left-column">
+			<div id="result_div_wiki"></div>
+		</div>
+	</main>
+
 </body>
+
+<!--
+世界レベルの研究大学を目指して、いずれも国立の東京医科歯科大と東京工業大が、統合に向けた協議を開始することがわかった。
+運営法人の傘下に２大学を置く方式か、単一の新たな大学となるかは今後検討する。
+両大学が得意とする医療や工学など幅広い分野で先端研究を展開し、政府が年数百億円を支援する「国際卓越研究大学」の指定を目指す。
+-->
+
+<!--
+オキシトシン（OXT）は、視床下部で産生される神経ペプチドです。OXT産生ニューロンは軸索を神経下垂体後葉、
+つまり下垂体後葉に投射し、ペプチドホルモンとして末梢的にOXTを血液循環に放出します。
+これらのニューロンはまた、いくつかの脳領域を神経支配し、そこで神経ペプチドとしてOXTを放出します。
+したがって、OXTは、子宮収縮や授乳などの末梢性機能だけでなく、社会的、攻撃的、恐怖、母性行動などの中枢性機能の調節にも関与しています。	
+-->
+
 </html>

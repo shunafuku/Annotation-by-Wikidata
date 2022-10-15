@@ -1,0 +1,100 @@
+ /** ツリービュー全体、ツリービューサブ */
+ .treeview,
+ .treeview ul {
+     margin: 0 0 0 0;
+     padding: 0 0 0 25px;
+     list-style: none;
+     vertical-align: middle;
+     position: relative;
+ }
+
+ /** ツリー項目 */
+ .treeview li {
+     position: relative;
+ }
+
+ /** 項目前の横棒 */
+ .treeview li::before {
+     content: "";
+     position: relative;
+     top: -4px;
+     display: inline-block;
+     margin-left: 10px;
+     margin-right: 5px;
+     width: 10px;
+     height: 1px;
+     background: #ccc;
+ }
+
+ /** チェックボックスがある項目前の横棒 (位置調整) */
+ .treeview li.expandable::before {
+     margin-left: 10px;
+     margin-right: 0;
+ }
+
+ /** 項目前の縦棒 */
+ .treeview li::after {
+     content: "";
+     display: block;
+     position: absolute;
+     top: 0;
+     left: 10px;
+     bottom: 0;
+     width: 1px;
+     background: #ccc;
+ }
+
+ /** 最後の項目前の縦棒 */
+ .treeview li:last-child::after {
+     bottom: 10px;
+ }
+
+ /** 最後の項目が開閉できる場合の縦棒 */
+ .treeview li.expandable:last-child::after {
+     bottom: initial;
+     height: 10px;
+ }
+
+ /** チェックボックス */
+ .treeview li>[type=checkbox] {
+     vertical-align: middle;
+     position: absolute;
+     left: 0;
+     z-index: 1;
+ }
+
+ /** チェックボックスのそばにあるサブ項目 */
+ .treeview li>[type=checkbox]~ul {
+     display: none;
+ }
+
+ /** チェックボックスのそばにあるサブ項目(チェック時開く) */
+ .treeview li>[type=checkbox]:checked~ul {
+     display: block;
+ }
+
+ /** チェックボックス変更例 */
+ .treeview.cross [type=checkbox] {
+     visibility: hidden;
+ }
+
+ .treeview.cross [type=checkbox]+label::before {
+     content: "";
+     position: absolute;
+     top: 5px;
+     left: 5px;
+     z-index: 1;
+     width: 9px;
+     height: 9px;
+     border: 1px solid black;
+     background:
+         linear-gradient(to bottom, transparent 46%, black 46%, black 54%, transparent 54%),
+         linear-gradient(to right, transparent 46%, black 46%, black 54%, transparent 54%),
+         linear-gradient(to bottom, white, white);
+ }
+
+ .treeview.cross [type=checkbox]:checked+label::before {
+     background:
+         linear-gradient(to bottom, transparent 46%, black 46%, black 54%, transparent 54%),
+         linear-gradient(to bottom, white, white);
+ }
