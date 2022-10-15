@@ -1,1 +1,1 @@
-# senopages
+# Mediawiki APIとSPARQLによって文章をアノテーションするアプリ
