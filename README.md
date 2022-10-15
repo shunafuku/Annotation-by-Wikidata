@@ -1,6 +1,6 @@
 # Mediawiki APIとSPARQLによって文章をアノテーションするアプリ
 ### [アプリ実行](https://masapi61.github.io/Annotation-by-Wikidata/index.html)  
-　キーワードからwikidataを通してそのキーワードの情報を正確に得ること。また、それに関連した情報を得ることを目的にして開発したアプリケーションになります。仕組みはMediawiki APIのWikidataラベル検索API、[前方一致検索API](https://www.wikidata.org/w/api.php?action=help&modules=wbsearchentities)と[あいまい検索API](https://www.mediawiki.org/w/api.php?action=help&modules=query%2Bsearch)にkuromoji.jsで形態素解析を行い抽出した名詞を入力して検索し、そのラベル検索APIから得たwikidataのidを次はSPARQLに問い合わせてカテゴリーなどの情報を得ています。APIとSPARQLを繰り返し利用する性質上、処理時間がとても長くなっていることが欠点です。
+　キーワードから[wikidata](https://www.wikidata.org/wiki/Wikidata:%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8)を通してそのキーワードの情報を正確に得ること。また、それに関連した情報を得ることを目的にして開発したアプリケーションになります。仕組みはMediawiki APIのWikidataラベル検索API、[前方一致検索API](https://www.wikidata.org/w/api.php?action=help&modules=wbsearchentities)と[あいまい検索API](https://www.mediawiki.org/w/api.php?action=help&modules=query%2Bsearch)にkuromoji.jsで形態素解析を行い抽出した名詞を入力して検索し、そのラベル検索APIから得たwikidataのidを次はSPARQLに問い合わせてカテゴリーなどの情報を得ています。APIとSPARQLを繰り返し利用する性質上、処理時間がとても長くなっていることが欠点です。
  
 # 使い方  
 * 真ん中のテキストエリアにアノテーションしたい文章を入力して下さい。そしてアノテーション実行ボタンをクリックするとアノテーションが実行されます。  
