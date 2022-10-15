@@ -17,9 +17,10 @@
 	<script>
 		/*ローカルで行う場合、クローム起動時に
 		    
+		DPC
 		"C:\Program Files\Google\Chrome\Application\chrome.exe" --allow-file-access-from-files
 
-		もしくは
+		NPC
 		"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --allow-file-access-from-files
 	
 		でコマンドで起動が必要！*/
@@ -174,17 +175,19 @@
 									if (s_cat[0] !== undefined) {
 										wikidata_log[i].push(create_category(searched_category, query_data));
 										//リンクテキストの生成
-										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-											+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "") + '" target="_blank" style ="background:'
-											+ s_cat[1] + '">' + name + '</a></b>']);
+										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
+											+ "'" + ');" style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
 									} else {
-										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-											+ info[0].title + '" target="window">' + name + '</a></b>']);
+										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+											+ info[0].title + "');" + '">' + name + '</a></b>']);
 									}
 
 								} else {
-									await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-										+ info[0].id + '" target="window">' + name + '</a></b>']);
+									await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+										+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+										+ info[0].id + "');" + '">' + name + '</a></b>']);
 								}
 
 							}
@@ -215,16 +218,19 @@
 
 										wikidata_log[i].push(create_category(searched_category, query_data));
 										//リンクテキストの生成
-										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-											+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
-											+ '" target="_blank" style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
+										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
+											+ "'" + ');"'
+											+ 'style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
 									} else {
-										await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-											+ info[0].title + '" target="_blank">' + name + '</a></b>']);
+										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+											+ info[0].title + "');" + '">' + name + '</a></b>']);
 									}
 								} else {
-									await linked_string.push([name, '<b><a href="https://kgs.hozo.jp/sample/details.html?key=wd:'
-										+ info[0].title + '" target="_blank">' + name + '</a></b>']);
+									await linked_string.push([name, '<b><a href="javascript:ShowDetails('
+										+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+										+ info[0].title + "');" + '">' + name + '</a></b>']);
 								}
 							}
 						}
@@ -242,7 +248,7 @@
 							//console.log(tokens[i].surface_form)
 							for (let j = 0; j < linked_string.length; j++) {
 								if (linked_string[j][0] == tokens[i].surface_form) {
-									textOUTPUT += linked_string[j][1];
+									textOUTPUT += linked_string[j][1] + ' ';
 									break;
 								}
 							}
@@ -464,6 +470,15 @@
 			return output;
 		}
 
+		//別ウィンドウwikidata表示関数
+		function ShowDetails(page) {
+			let lw = window.innerWidth - 400;
+			let y = window.screenY + 100;
+
+			if (lw < 0) { lw = 100; }
+			window.open(page, "DetailsWin", "left=" + lw + ",top=" + y + ",width=400,height=600,scrollbars=1");
+		}
+
 		//ローディング画面用の関数
 		function dispLoading(msg) {
 			// 引数なしの場合、メッセージは非表示。
@@ -497,36 +512,39 @@
 	<h1>Wikidataを用いたアノテーションシステム</h1>
 	<hr>
 	<main>
+		<h3><a class="treeview" href="https://github.com/masapi61/Annotation-by-Wikidata" target="_blank">
+				使い方(githubレポジトリ)</a></h3>
 		<div class="left-column0">
 			<ul class="treeview">
 				<b>カテゴリー</b>:<br>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-0" value="activity">
-					<label for="cat-0" style="background:red" #>活動</label>
+					<label for="cat-0" style="background:rgb(255, 143, 143)" #>活動</label>
 					<ul>
 						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-0" value="game">
-							<label for="cat-0-0" style="background:red">ゲーム</label>
+							<label for="cat-0-0" style="background:rgb(255, 143, 143)">ゲーム</label>
 						</li>
 						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-1" value="sport">
-							<label for="cat-0-1" style="background:red">スポーツ</label>
+							<label for="cat-0-1" style="background:rgb(255, 143, 143)">スポーツ</label>
 						</li>
 					</ul>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-1"
 						value="class of anatomical entity"> <label for="cat-1"
-						style="background:lightslategray">解剖学的構造</label>
+						style="background:gainsboro">解剖学的構造</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-2" value="disease">
-					<label for="cat-2" style="background:green">疾患</label>
+					<label for="cat-2" style="background:rgb(117, 214, 161)">疾患</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-3" value="drug"> <label
 						for="cat-3" style="background:yellow">薬</label></li>
-				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-4" value="organisation"> <label
-						for="cat-4" style="background:purple">組織</label></li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-4" value="organisation">
+					<label for="cat-4" style="background:rgb(204, 179, 255)">組織</label>
+				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-5" value="person">
 					<label for="cat-5" style="background:orange">人物</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-6" value="place">
-					<label for="cat-6" style="background:brown">場所</label>
+					<label for="cat-6" style="background:peachpuff">場所</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-7" value="chemical substance">
 					<label for="cat-7" style="background:aqua">化学物質</label>
