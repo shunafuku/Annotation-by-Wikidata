@@ -167,7 +167,7 @@
 									}
 									query_data = await sparql_query(wikidata_ids);
 									console.log("クエリの結果", query_data);
-									console.log(Array.from(checklist.entries()).length);
+									//console.log(Array.from(checklist.entries()).length);
 
 									//カテゴリーにマッチしたwikidataidと色の対応
 									let s_cat = select_category(query_data, checklist, matchlist);
@@ -353,8 +353,8 @@
 					}
 				}
 			}
-			console.log(purpose_id);
-			console.log(color);
+			//console.log(purpose_id);
+			//console.log(color);
 			let res = [purpose_id[0], color[0]];
 
 			return res;
