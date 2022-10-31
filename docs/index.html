@@ -138,6 +138,13 @@
 						}
 					}
 
+					//単語の出現順にソート
+					words.sort(function (a, b) {
+						return a.word_position - b.word_position;
+					});
+					console.log("wikidata検索ワード", words);
+
+
 					var linked_string = new Array();
 					var query_data;
 					for (let i = 0; i < words.length; i++) {
@@ -152,7 +159,6 @@
 							console.log("サーチAPI結果(前方一致)", APIresponse);
 							let name = APIresponse.searchinfo.search;
 							let info = APIresponse.search;
-
 
 							//ログを蓄積
 							wikidata_log.push([name, info]);
@@ -177,17 +183,17 @@
 										//リンクテキストの生成
 										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
-											+ "'" + ');" style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
+											+ "'" + ');" style ="background:' + s_cat[1] + '">' + name + '</a></b>', words[i].word_position]);
 									} else {
 										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-											+ info[0].title + "');" + '">' + name + '</a></b>']);
+											+ info[0].title + "');" + '">' + name + '</a></b>', words[i].word_position]);
 									}
 
 								} else {
 									await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 										+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-										+ info[0].id + "');" + '">' + name + '</a></b>']);
+										+ info[0].id + "');" + '">' + name + '</a></b>', words[i].word_position]);
 								}
 
 							}
@@ -221,16 +227,16 @@
 										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
 											+ "'" + ');"'
-											+ 'style ="background:' + s_cat[1] + '">' + name + '</a></b>']);
+											+ 'style ="background:' + s_cat[1] + '">' + name + '</a></b>', words[i].word_position]);
 									} else {
 										await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 											+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-											+ info[0].title + "');" + '">' + name + '</a></b>']);
+											+ info[0].title + "');" + '">' + name + '</a></b>', words[i].word_position]);
 									}
 								} else {
 									await linked_string.push([name, '<b><a href="javascript:ShowDetails('
 										+ "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-										+ info[0].title + "');" + '">' + name + '</a></b>']);
+										+ info[0].title + "');" + '">' + name + '</a></b>', words[i].word_position]);
 								}
 							}
 						}
@@ -242,13 +248,13 @@
 
 
 					for (let i = 0; i < tokens.length; i++) {
-						const judge = linked_string.some(data => data.indexOf(tokens[i].surface_form) != -1);
+						const judge = linked_string.some(data => data.indexOf(tokens[i].word_position) != -1);
 						//console.log(judge);
 						if (judge === true) {
 							//console.log(tokens[i].surface_form)
 							for (let j = 0; j < linked_string.length; j++) {
-								if (linked_string[j][0] == tokens[i].surface_form) {
-									textOUTPUT += linked_string[j][1];
+								if ((linked_string[j][2] == tokens[i].word_position) && (linked_string[j][0] == tokens[i].surface_form)) {
+									textOUTPUT += linked_string[j][1] + ' ';
 									break;
 								}
 							}
@@ -417,10 +423,15 @@
 					if (blacklist[i] === target[j].pos_detail_1) {
 						//console.log(target[j]);
 						target.splice(j, 1);
+					} else if (blacklist[i] === target[j].pos_detail_2) {
+						//console.log(target[j]);
+						target.splice(j, 1);
+					} else if (blacklist[i] === target[j].pos_detail_3) {
+						//console.log(target[j]);
+						target.splice(j, 1);
 					}
 				}
 			}
-			console.log("wikidata検索ワード", target);
 			return target;
 		}
 
@@ -431,10 +442,13 @@
 				for (let j = 0; j < target.length; j++) {
 					if (whitelist[i] === target[j].pos_detail_1) {
 						list.push(target[j]);
+					} else if (whitelist[i] === target[j].pos_detail_2) {
+						list.push(target[j]);
+					} else if (whitelist[i] === target[j].pos_detail_3) {
+						list.push(target[j]);
 					}
 				}
 			}
-			console.log("wikidata検索ワード", list);
 			return list;
 		}
 
@@ -505,6 +519,36 @@
 			});
 		}
 
+		//例文
+		function example1() {
+			var textarea = document.getElementById('input_text');
+			textarea.value = "オキシトシン（OXT）は、視床下部で産生される神経ペプチドです。OXT産生ニューロンは軸索を神経下垂体後葉、"
+				+ "つまり下垂体後葉に投射し、ペプチドホルモンとして末梢的にOXTを血液循環に放出します。これらのニューロン"
+				+ "はまた、いくつかの脳領域を神経支配し、そこで神経ペプチドとしてOXTを放出します。したがって、OXTは、子宮"
+				+ "収縮や授乳などの末梢性機能だけでなく、社会的、攻撃的、恐怖、母性行動などの中枢性機能の調節にも関与して"
+				+ "います。"
+			//console.log(document.getElementById('input_text').value);
+		}
+		function example2() {
+			var textarea = document.getElementById('input_text');
+			textarea.value = "日本国（にほんこく、にっぽんこく、英: Japan）、または日本（にほん、にっぽん）は、東アジアに位置する民主制国家[1]。首都は東京都[注 3][2][3]。"
+				+ "全長3500キロメートル以上にわたる国土は、主に日本列島[注 7]および千島列島・南西諸島・伊豆諸島・小笠原諸島などの弧状列島により構成され[3][4]、大部分が温帯に属するが、"
+				+ "北部や島嶼部では亜寒帯や熱帯の地域がある[5][6]。地形は起伏に富み、火山地・丘陵を含む山地の面積は国土の約75 % を占め[6]、沿岸の平野部に人口が集中している。"
+				+ "国内には行政区分として47の都道府県があり、日本人（大和民族・琉球民族・アイヌ民族[注 8]・外国系の人々）と外国人が居住し、日本語を通用する[2][3]。"
+				+ "明治維新後の1889年（明治22年）に大日本帝国憲法を制定し立憲国家となる。太平洋戦争後の連合国による占領期の1947年（昭和22年）には現行の日本国憲法を施行し民主制へ移行。"
+				+ "1952年（昭和27年）、サンフランシスコ平和条約により主権を回復した[3]。"
+			//console.log(document.getElementById('input_text').value);
+		}
+		function example3() {
+			var textarea = document.getElementById('input_text');
+			textarea.value = "養殖業（ようしょくぎょう、英語: aquaculture）とは、生物を、その本体または副生成物を食品や工業製品などとして利用することを目的として、"
+				+ "人工的に育てる産業である。金魚、錦鯉などを鑑賞・愛玩目的で育てることは「養魚」と称する場合が多い[1]。"
+				+ "狭義及び通常は、水産業（養殖漁業）の一種で、魚介類や海藻などの水棲生物の人為的繁殖について使われる。広義には、生物全般を育てることを指すが、"
+				+ "陸生植物に関しては栽培・農耕、哺乳類に関しては畜産、そのうち乳牛などは酪農、ニワトリに関しては養鶏、ブタは養豚という用語がある。"
+			//console.log(document.getElementById('input_text').value);
+		}
+
+
 	</script>
 </head>
 
@@ -512,8 +556,11 @@
 	<h1>Wikidataを用いたアノテーションシステム</h1>
 	<hr>
 	<main>
-		<h3><a class="treeview" href="https://github.com/masapi61/Annotation-by-Wikidata" target="_blank">
-				使い方(githubレポジトリ)</a></h3>
+		<h3>
+			<a class="treeview" href="https://github.com/masapi61/Annotation-by-Wikidata" target="_blank">
+				使い方(githubレポジトリ)
+			</a>
+		</h3>
 		<div class="left-column0">
 			<ul class="treeview">
 				<b>カテゴリー</b>:<br>
@@ -549,8 +596,9 @@
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-7" value="chemical substance">
 					<label for="cat-7" style="background:aqua">化学物質</label>
 				</li>
-				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-8" value="species">
-					<label for="cat-8" style="background:lime">種</label>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-8"
+						value="group or class of organisms">
+					<label for="cat-8" style="background:lime">生物</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-9" value="work">
 					<label for="cat-9" style="background:pink">仕事</label>
@@ -559,6 +607,9 @@
 		</div>
 
 		<div class="left-column">
+			<button id="example1" onclick="example1()">例文1</button>
+			<button id="example2" onclick="example2()">例文2</button>
+			<button id="example3" onclick="example3()">例文3</button>
 			<details>
 				<summary><b>詳細設定</b></summary>
 				<div class="left-column">
@@ -568,22 +619,23 @@
 								checked>前方一致</label>
 						<label><input type="radio" id="LabelAmbi" name="labelType" value="ambi">あいまい検索</label><br><br>
 						<b>品詞の選択</b>:<br>
-						<input type="radio" name="radio_noun" value="u_noun">固有名詞のみ<br>
-						<input type="radio" name="radio_noun" value="noun">名詞のみ<br>
-						<input type="radio" name="radio_noun" value="noun_w" checked>名詞ホワイトリスト<br><input type="text"
-							id="noun_w" size="40" value="固有名詞,一般"><br>
-						<input type="radio" name="radio_noun" value="noun_b">名詞ブラックリスト<br><input type="text" id="noun_b"
-							size="40" value="数,代名詞,非自立,形容動詞語幹,副詞可能"><br>
+						<label>
+							<input type="radio" name="radio_noun" value="u_noun">固有名詞のみ
+						</label><br>
+						<label>
+							<input type="radio" name="radio_noun" value="noun">名詞のみ
+						</label><br>
+						<label>
+							<input type="radio" name="radio_noun" value="noun_w" checked>名詞ホワイトリスト</label><br>
+						<input type="text" id="noun_w" size="40" value="固有名詞,一般"><br>
+						<label>
+							<input type="radio" name="radio_noun" value="noun_b">名詞ブラックリスト</label><br>
+						<input type="text" id="noun_b" size="40" value="数,代名詞,非自立,形容動詞語幹,副詞可能"><br>
 					</p>
 				</div>
 
 			</details>
 			<textarea id="input_text">
-オキシトシン（OXT）は、視床下部で産生される神経ペプチドです。OXT産生ニューロンは軸索を神経下垂体後葉、
-つまり下垂体後葉に投射し、ペプチドホルモンとして末梢的にOXTを血液循環に放出します。これらのニューロン
-はまた、いくつかの脳領域を神経支配し、そこで神経ペプチドとしてOXTを放出します。したがって、OXTは、子宮
-収縮や授乳などの末梢性機能だけでなく、社会的、攻撃的、恐怖、母性行動などの中枢性機能の調節にも関与して
-います。
 	</textarea>
 			<br>
 			<button id="anotate">アノテーション実行</button>
@@ -599,18 +651,5 @@
 	</main>
 
 </body>
-
-<!--
-世界レベルの研究大学を目指して、いずれも国立の東京医科歯科大と東京工業大が、統合に向けた協議を開始することがわかった。
-運営法人の傘下に２大学を置く方式か、単一の新たな大学となるかは今後検討する。
-両大学が得意とする医療や工学など幅広い分野で先端研究を展開し、政府が年数百億円を支援する「国際卓越研究大学」の指定を目指す。
--->
-
-<!--
-オキシトシン（OXT）は、視床下部で産生される神経ペプチドです。OXT産生ニューロンは軸索を神経下垂体後葉、
-つまり下垂体後葉に投射し、ペプチドホルモンとして末梢的にOXTを血液循環に放出します。
-これらのニューロンはまた、いくつかの脳領域を神経支配し、そこで神経ペプチドとしてOXTを放出します。
-したがって、OXTは、子宮収縮や授乳などの末梢性機能だけでなく、社会的、攻撃的、恐怖、母性行動などの中枢性機能の調節にも関与しています。	
--->
 
 </html>
