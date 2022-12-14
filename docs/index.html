@@ -349,7 +349,10 @@
 
 					var linked_string = new Array();
 					for (let i = 0; i < words.length; i++) {
-						let judge = fukugou_linked_string.some((data) => data.word_position == words[i].word_position);
+						let judge;
+						if (fukugou_linked_string != null) {
+							judge = fukugou_linked_string.some((data) => data.word_position == words[i].word_position);
+						}
 						if (judge === true) {
 							let index = fukugou_linked_string.findIndex(({ word_position }) => word_position == words[i].word_position);
 							i += (fukugou_linked_string[index].word_count - 1);
@@ -409,8 +412,14 @@
 
 					var LOG = new Array();
 					for (let i = 0; i < tokens.length; i++) {
-						const judge0 = fukugou_linked_string.some((data) => data.word_position == tokens[i].word_position);
-						const judge = linked_string.some((data) => data.word_position == tokens[i].word_position);
+						let judge0;
+						let judge;
+						if (fukugou_linked_string != null) {
+							judge0 = fukugou_linked_string.some((data) => data.word_position == tokens[i].word_position);
+						}
+						if (linked_string != null) {
+							judge = linked_string.some((data) => data.word_position == tokens[i].word_position);
+						}
 						//console.log(judge0);
 						if (judge0 === true) {
 							for (let j = 0; j < fukugou_linked_string.length; j++) {
