@@ -12,9 +12,15 @@
 	<script type="text/javascript" src="./jscss/sparql.js" charset="UTF-8"></script>
 	<script src="./jscss/dbpedia_category.js"></script>
 	<script src="./jscss/categorylist_color.js"></script>
-	<title>Wikidataによる文章アノテーションシステム</title>
+	<title>Wikidataのクラス階層を用いたエンティティリンキング</title>
 
 	<script>
+		/*
+		ローカルで行う場合、vscodeで作業を推奨。
+		vscodeの拡張機能「Live server」を導入し、右下のGo Liveからデバッグ作業を行うと
+		kuromoji.jsを使用する際にローカルファイル読み込みエラーが起こらない。
+		*/
+
 		//kuromoji必要変数
 		const ids = [];
 		const names = [];
@@ -28,6 +34,7 @@
 		var CSVLOG;//csv出力用のグローバル変数
 
 		window.addEventListener('load', () => {
+			//アノテーション実行ボタン
 			const anotateButton = document.getElementById('anotate');
 			//検索結果のカテゴリー表示エリア
 			const resultArea0 = document.getElementById('result_category');
@@ -38,7 +45,7 @@
 			//カテゴリーチェックボックス階層
 			const CATcheckbox = document.getElementsByClassName('hierarchy0');
 			//例文の呼び出し
-			//example1();
+			example1();
 
 			//console.log("DBペディアカテゴリー", dbpedia_categorylist);
 			//console.log("カテゴリー0階層目",CATcheckbox);
@@ -64,6 +71,7 @@
 				//詳細設定ラジオボタン
 				const select_noun = radio_value('radio_noun');
 				const searchtype = radio_value('labelType');
+				const linktype = radio_value('linkType');
 
 				// Loading 画像を表示
 				dispLoading("処理中...");
@@ -79,6 +87,7 @@
 
 							let j = 0;
 							while (true) {
+								//チェックボックスのidを取得(2階層目まではこれで対応)
 								let CATcheckbox1 = document.getElementById('cat-' + i + '-' + j);
 								if (CATcheckbox1 != null) {
 									if (CATcheckbox1.checked) {
@@ -92,7 +101,7 @@
 							}
 						}
 					}
-					//console.log('カテゴリナンバー → カテゴリ名', checklist);
+					console.log('カテゴリナンバー → カテゴリ名', checklist);
 					for (let db of dbpedia_categorylist) {
 						for (let val of checklist.values()) {
 							if (db.clsLabel.value == val) {
@@ -100,11 +109,32 @@
 							}
 						}
 					}
-					//.log('カテゴリ名 → wikidata_url', matchlist);
+					console.log('カテゴリ名 → wikidata_url', matchlist);
 
 
 					//kuoromoji形態素解析結果の格納
 					var tokens = await promise_analysis(textINPUT);
+
+					//人物名の抽出
+					var tmp_person_name_array = person_name(tokens);
+					//console.log('人物名', tmp_person_name_array);
+
+					//複合語の配列と同じ型に変換
+					var person_name_array = new Array();
+					for (let i = 0; i < tmp_person_name_array.length; i++) {
+						let tmp_array = new Array();
+						for (const element of tmp_person_name_array[i]) {
+							tmp_array.push({
+								name: element.surface_form, word_position: element.word_position,
+								pos: {
+									name: element.surface_form, pos_detail_1: element.pos_detail_1,
+									pos_detail_2: element.pos_detail_2, pos_detail_3: element.pos_detail_3
+								}
+							})
+						}
+						person_name_array.push(tmp_array);
+					}
+					console.log('人物名', person_name_array);
 
 					tokens.forEach((token) => {// 解析結果を順番に取得する
 						if (select_noun == "u_noun") {
@@ -141,18 +171,23 @@
 					words.sort(function (a, b) {
 						return a.word_position - b.word_position;
 					});
-					console.log("wikidata検索ワード", words);
 
+
+					console.log("wikidata検索ワード", words);
 
 					//複合語の取り出して検索
 					let fukugougo = associated_noun(words);
+					//複合語配列と人物名配列の結合
+					fukugougo = fukugougo.concat(person_name_array);
 					console.log("複合語", fukugougo);
+
 					if (fukugougo.length != 0) {
 						var fukugou_APIres = new Array();
 
 						for (let i = 0; i < fukugougo.length; i++) {
 							let search_word = fukugougo[i].map(obj => obj.name);
 							let search_word_str = search_word.join('');
+							let search_word_pos = fukugougo[i].map(obj => obj.pos);
 
 							if (searchtype == "Full") {
 								if (2 < fukugougo[i].length) {
@@ -165,26 +200,37 @@
 											tmpres.push(res0.search[j]);
 										}
 									}
-									if (tmpres.length != 0) {
-										res0.search = tmpres;
-									}
+									let res0search = label_type(tmpres);
 									//console.log(res0.searchinfo.search, res0);
-									if (res0.search.length != 0) {
-										fukugou_APIres.push({ 'name': res0.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': res0.search });
-									} else if (res0.search.length == 0) {	//検索結果が見つからなかった場合分割して検索
+									if (res0search.length != 0) {
+										fukugou_APIres.push({
+											'name': res0.searchinfo.search,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': res0search,
+											"pos": search_word_pos
+										});
+									} else if (res0search.length == 0) {	//検索結果が見つからなかった場合分割して検索
 
 										//まずは後ろを塊にして検索
-										let res1 = await full_three_words_or_more_behind(search_word, APIlimit);
+										let res1 = await full_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
 										if (res1 == 0) {
 
 											//今度は前を塊にして検索
-											let res2 = await full_three_words_or_more_forward(search_word, APIlimit);
+											let res2 = await full_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
 											if (res2 == 0) {
 												//0が返ってきた場合複合語での検索結果は見つかっていない
 												console.log(search_word_str, "は検索結果無");
 											} else if (res2 != 0) {
+
 												if (res2.search.length != 0) {
-													fukugou_APIres.push({ 'name': res2.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': res2.word_count, 'search': res2.search });
+													fukugou_APIres.push({
+														'name': res2.searchinfo.search,
+														'word_position': fukugougo[i][0].word_position,
+														'word_count': res2.word_count,
+														'search': res2.search,
+														'pos': res2.pos
+													});
 												}
 											}
 
@@ -197,7 +243,13 @@
 													}
 												}
 
-												fukugou_APIres.push({ 'name': res1.searchinfo.search, 'word_position': word_position, 'word_count': res1.word_count, 'search': res1.search });
+												fukugou_APIres.push({
+													'name': res1.searchinfo.search,
+													'word_position': word_position,
+													'word_count': res1.word_count,
+													'search': res1.search,
+													'pos': res1.pos
+												});
 											}
 										}
 									}
@@ -211,8 +263,18 @@
 											tmpres.push(res.search[j]);
 										}
 									}
-									if (tmpres.length != 0) {
-										fukugou_APIres.push({ 'name': res.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': tmpres });
+									//console.log(tmpres);
+									let ressearch = label_type(tmpres);
+									if (ressearch.length != 0) {
+										fukugou_APIres.push({
+											'name': res.searchinfo.search,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': ressearch,
+											'pos': search_word_pos
+										});
+									} else {
+										console.log(search_word_str, 'は検索結果無')
 									}
 								}
 							} else if (searchtype == "forward") {
@@ -221,25 +283,38 @@
 
 									let res0 = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
 									res0.word_count = search_word.length;
-									console.log(res0.searchinfo.search, res0);
+									//console.log(res0.searchinfo.search, res0);
 
-									if (res0.search.length != 0) {
-										fukugou_APIres.push({ 'name': res0.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': res0.search });
+									let res0search = label_type(res0.search);
+									if (res0search.length != 0) {
+										fukugou_APIres.push({
+											'name': res0.searchinfo.search,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': res0search,
+											'pos': search_word_pos
+										});
 
 									} else if (res0.search.length == 0) { //検索結果が見つからなかった場合分割して検索
 
 										//まずは後ろを塊にして検索
-										let res1 = await forward_three_words_or_more_behind(search_word, APIlimit);
+										let res1 = await forward_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
 										if (res1 == 0) {
 
 											//今度は前を塊にして検索
-											let res2 = await forward_three_words_or_more_forward(search_word, APIlimit);
+											let res2 = await forward_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
 											if (res2 == 0) {
 												//0が返ってきた場合複合語での検索結果は見つかっていない
 												console.log(search_word_str, "は検索結果無");
 											} else if (res2 != 0) {
 												if (res2.search.length != 0) {
-													fukugou_APIres.push({ 'name': res2.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': res2.word_count, 'search': res2.search });
+													fukugou_APIres.push({
+														'name': res2.searchinfo.search,
+														'word_position': fukugougo[i][0].word_position,
+														'word_count': res2.word_count,
+														'search': res2.search,
+														'pos': res2.pos
+													});
 												}
 											}
 
@@ -252,7 +327,13 @@
 													}
 												}
 
-												fukugou_APIres.push({ 'name': res1.searchinfo.search, 'word_position': word_position, 'word_count': res1.word_count, 'search': res1.search });
+												fukugou_APIres.push({
+													'name': res1.searchinfo.search,
+													'word_position': word_position,
+													'word_count': res1.word_count,
+													'search': res1.search,
+													'pos': res1.pos
+												});
 											}
 										}
 									}
@@ -261,8 +342,17 @@
 									//二単語の複合語の検索
 
 									let res = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
-									if (res.search.length != 0) {
-										fukugou_APIres.push({ 'name': res.searchinfo.search, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': res.search });
+									let ressearch = label_type(res.search);
+									if (ressearch.length != 0) {
+										fukugou_APIres.push({
+											'name': res.searchinfo.search,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': ressearch,
+											'pos': search_word_pos
+										});
+									} else {
+										console.log(search_word_str, 'は検索結果無')
 									}
 								}
 
@@ -275,22 +365,34 @@
 									console.log(search_word_str, res0);
 
 									if (res0.query.search.length != 0) {
-										fukugou_APIres.push({ 'name': search_word_str, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': res0.query.search });
+										fukugou_APIres.push({
+											'name': search_word_str,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': res0.query.search,
+											'pos': search_word_pos
+										});
 
 									} else if (res0.query.search.length == 0) { //検索結果が見つからなかった場合分割して検索
 
 										//まずは後ろを塊にして検索
-										let res1 = await ambi_three_words_or_more_behind(search_word, APIlimit);
+										let res1 = await ambi_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
 										if (res1 == 0) {
 
 											//今度は前を塊にして検索
-											let res2 = await ambi_three_words_or_more_forward(search_word, APIlimit);
+											let res2 = await ambi_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
 											if (res2 == 0) {
 												//0が返ってきた場合複合語での検索結果は見つかっていない
 												console.log(search_word_str, "は検索結果無");
 											} else if (res2 != 0) {
 												if (res2.query.search.length != 0) {
-													fukugou_APIres.push({ 'name': search_word_str, 'word_position': fukugougo[i][0].word_position, 'word_count': res2.word_count, 'search': res2.query.search });
+													fukugou_APIres.push({
+														'name': search_word_str,
+														'word_position': fukugougo[i][0].word_position,
+														'word_count': res2.word_count,
+														'search': res2.query.search,
+														"pos": res2.pos
+													});
 												}
 											}
 
@@ -299,7 +401,13 @@
 												const num = search_word.length - res1.word_count;
 												const word_position = fukugougo[i][num].word_position;
 
-												fukugou_APIres.push({ 'name': search_word_str, 'word_position': word_position, 'word_count': res1.word_count, 'search': res1.query.search });
+												fukugou_APIres.push({
+													'name': search_word_str,
+													'word_position': word_position,
+													'word_count': res1.word_count,
+													'search': res1.query.search,
+													'pos': res1.pos
+												});
 											}
 										}
 									}
@@ -310,7 +418,15 @@
 									let res = await promise_get_list_search(search_word_str, APIlimit);
 									//console.log(res);
 									if (res.query.search.length != 0) {
-										fukugou_APIres.push({ 'name': search_word_str, 'word_position': fukugougo[i][0].word_position, 'word_count': fukugougo[i].length, 'search': res.query.search });
+										fukugou_APIres.push({
+											'name': search_word_str,
+											'word_position': fukugougo[i][0].word_position,
+											'word_count': fukugougo[i].length,
+											'search': res.query.search,
+											'pos': search_word_pos
+										});
+									} else {
+										console.log(search_word_str, 'は検索結果無')
 									}
 								}
 							}
@@ -320,26 +436,43 @@
 						var fukugou_linked_string = new Array();
 						if (searchtype == 'ambi') {
 							for (let i = 0; i < fukugou_APIres.length; i++) {
-								console.log(fukugou_APIres[i]);
 								let wikidata_ids = '';
 								let name = fukugou_APIres[i].name;
 								let info = fukugou_APIres[i].search;
+								console.log(fukugou_APIres[i]);
 
-								let sparlqres = await create_linked_string_ambi(name, info, fukugou_APIres[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
-								sparlqres.word_count = fukugou_APIres[i].word_count;
-								fukugou_linked_string.push(sparlqres);
+								let sparqlres = await create_linked_string_ambi(name, info, fukugou_APIres[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
+								sparqlres.pos_detail_1 = fukugou_APIres[i].pos.pos_detail_1;
+								sparqlres.pos_detail_2 = fukugou_APIres[i].pos.pos_detail_2;
+								sparqlres.pos_detail_3 = fukugou_APIres[i].pos.pos_detail_3;
+								sparqlres.word_count = fukugou_APIres[i].word_count;
+								fukugou_linked_string.push(sparqlres);
 
 							}
 
 						} else {
 							for (let i = 0; i < fukugou_APIres.length; i++) {
+								//console.log(fukugou_APIres[i]);
 								let wikidata_ids = '';
 								let name = fukugou_APIres[i].name;
 								let info = fukugou_APIres[i].search;
 
-								let sparlqres = await create_linked_string_forward(name, info, fukugou_APIres[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
-								sparlqres.word_count = fukugou_APIres[i].word_count;
-								fukugou_linked_string.push(sparlqres);
+								//console.log(name, info);
+								let sparqlres = await create_linked_string_forward(name, info, fukugou_APIres[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
+								for (let j = 0; j < fukugou_APIres[i].pos.length; j++) {
+									if (j == 0) {
+										sparqlres.pos_detail_1 = fukugou_APIres[i].pos[j].pos_detail_1;
+										sparqlres.pos_detail_2 = fukugou_APIres[i].pos[j].pos_detail_2;
+										sparqlres.pos_detail_3 = fukugou_APIres[i].pos[j].pos_detail_3;
+									} else {
+										sparqlres.pos_detail_1 += '.' + fukugou_APIres[i].pos[j].pos_detail_1;
+										sparqlres.pos_detail_2 += '.' + fukugou_APIres[i].pos[j].pos_detail_2;
+										sparqlres.pos_detail_3 += '.' + fukugou_APIres[i].pos[j].pos_detail_3;
+									}
+
+								}
+								sparqlres.word_count = fukugou_APIres[i].word_count;
+								fukugou_linked_string.push(sparqlres);
 
 							}
 						}
@@ -374,8 +507,11 @@
 									}
 								}
 								if (info.length != 0) {
-									let sparlqres = await create_linked_string_forward(name, info, words[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
-									linked_string.push(sparlqres);
+									let sparqlres = await create_linked_string_forward(name, info, words[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
+									sparqlres.pos_detail_1 = words[i].pos_detail_1;
+									sparqlres.pos_detail_2 = words[i].pos_detail_2;
+									sparqlres.pos_detail_3 = words[i].pos_detail_3;
+									linked_string.push(sparqlres);
 								}
 
 
@@ -384,12 +520,13 @@
 								//前方一致でAPIでwikidataに問い合わせ
 								let APIresponse = await promise_get_action_wbsearchentities(words[i].surface_form, APIlimit);
 								if (APIresponse.search.length != 0) {
-									console.log("サーチAPI結果(前方一致)", APIresponse);
+									//console.log("サーチAPI結果(前方一致)", APIresponse);
 									let name = APIresponse.searchinfo.search;
 									let info = APIresponse.search;
 
-									let sparlqres = await create_linked_string_forward(name, info, words[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
-									linked_string.push(sparlqres);
+									let sparqlres = await create_linked_string_forward(name, info, words[i].word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log);
+
+									linked_string.push(sparqlres);
 								}
 
 							} else if (searchtype == "ambi") {
@@ -410,6 +547,34 @@
 					console.log('wikidata検索結果', wikidata_log);
 					console.log('SPARQL検索結果', SPARQL_log);
 
+					//重複の削除
+					if (fukugou_linked_string != null) {
+						const result = fukugou_linked_string.filter((item, index, self) => {
+							// name だけをリスト化する
+							const idList = self.map(item => item['wikidata_id']);
+							// 重複を削除する
+							if (idList.indexOf(item.wikidata_id) === index) {
+								return item;
+							}
+						});
+						//console.log(result);
+						fukugou_linked_string = result;
+					}
+					if (linked_string != null) {
+						const result = linked_string.filter((item, index, self) => {
+							// id だけをリスト化する
+							const idList = self.map(item => item['wikidata_id']);
+							//console.log(item.wikidata_id);
+							// 重複を削除する
+							if (idList.indexOf(item.wikidata_id) === index) {
+								return item;
+							}
+						});
+						//console.log(result);
+						linked_string = result;
+					}
+
+					//文章の組み立て
 					var LOG = new Array();
 					for (let i = 0; i < tokens.length; i++) {
 						let judge0;
@@ -424,7 +589,11 @@
 						if (judge0 === true) {
 							for (let j = 0; j < fukugou_linked_string.length; j++) {
 								if (fukugou_linked_string[j].word_position == tokens[i].word_position) {
-									textOUTPUT += fukugou_linked_string[j].link;
+									if (linktype == 'kgs') {
+										textOUTPUT += fukugou_linked_string[j].kgslink;
+									} else if (linktype == 'wikidata') {
+										textOUTPUT += fukugou_linked_string[j].link;
+									}
 									LOG.push(fukugou_linked_string[j]);
 									//console.log(fukugou_linked_string[j].link);
 									i += (fukugou_linked_string[j].word_count - 1);
@@ -435,7 +604,11 @@
 							//console.log(tokens[i].surface_form)
 							for (let j = 0; j < linked_string.length; j++) {
 								if ((linked_string[j].word_position == tokens[i].word_position) && (linked_string[j].name == tokens[i].surface_form)) {
-									textOUTPUT += linked_string[j].link;
+									if (linktype == 'kgs') {
+										textOUTPUT += linked_string[j].kgslink;
+									} else if (linktype == 'wikidata') {
+										textOUTPUT += linked_string[j].link;
+									}
 									LOG.push(linked_string[j]);
 									break;
 								}
@@ -451,12 +624,16 @@
 					});
 					console.log('置き換えられた単語', LOG);
 					CSVLOG = LOG;
+					for (let i = 0; i < CSVLOG.length; i++) {
+						delete CSVLOG[i].kgslink;
+						delete CSVLOG[i].link;
+					}
 
 					// Loading 画像を消す
 					removeLoading();
 					resultArea0.innerHTML = '<H2>カテゴリー</H2>' + searched_category;
 					resultArea1.innerHTML = '<H2>アノテーション結果</H2>' + textOUTPUT;
-					//document.getElementById('download').style.display = 'inline'
+					document.getElementById('download').style.display = 'inline'
 					//resultArea2.innerHTML = '<iframe id="kg" name="kg" width=450" height="600" ></iframe>';
 					return resultArea1;
 				}
@@ -481,15 +658,72 @@
 			});
 		}
 
+		//人物名の抽出
+		function person_name(tokens) {
+			let person_name_array = new Array();
+			let tmp_pname;
+			let word_position;
+			for (let i = 0; i < tokens.length - 2; i++) {
+				if ((tokens[i].pos == '名詞') && (tokens[i + 1].surface_form == '・') && (tokens[i + 2].pos == '名詞')) {
+					if (word_position == tokens[i].word_position) {
+						tmp_pname.push(tokens[i + 1], tokens[i + 2]);
+						person_name_array.pop();
+						person_name_array.push(tmp_pname);
+						word_position = tokens[i + 2].word_position;
+						i += 1;
+					} else {
+						tmp_pname = [tokens[i], tokens[i + 1], tokens[i + 2]];
+						word_position = tokens[i + 2].word_position;
+						person_name_array.push(tmp_pname);
+						i += 1;
+					}
+				} else if ((tokens[i].pos == '名詞') && (tokens[i + 1].surface_form == ' ') && (tokens[i + 2].pos == '名詞')) {
+					tokens[i + 1].surface_form = '';
+					tmp_pname = [tokens[i], tokens[i + 1], tokens[i + 2]];
+					person_name_array.push(tmp_pname);
+				}
+			}
+			return person_name_array;
+		}
+
 		//mediawiki_API 前方一致(検索ワード,結果取得上限数)
 		function promise_get_action_wbsearchentities(word, limit) {
 			return new Promise((resolve) => {
-
 				let urlw = "https://www.wikidata.org/w/api.php?action=wbsearchentities&search=" + word + "&limit=" + limit + "&language=ja&format=json&origin=*";
 				fetch(urlw)
 					.then(function (response) { return resolve(response.json()); })
 					.catch(function (error) { console.log(error); });
 			})
+		}
+		//ラベルのマッチタイプのフィルター
+		function label_type(res) {
+			//console.log(res);
+			let array = new Array();
+			const matchtype = radio_value('labelmatchType');
+			if (matchtype == 'labelpriority') {
+				for (let i = 0; i < res.length; i++) {
+					if (res[i].match.type == 'label') {
+						array.push(res[i]);
+					}
+				}
+				if (array.lenght > 0) {
+					res = array;
+					return res;
+				} else {
+					return res;
+				}
+
+			} else if (matchtype != 'default') {
+				for (let i = 0; i < res.length; i++) {
+					if (res[i].match.type == matchtype) {
+						array.push(res[i]);
+					}
+				}
+				res = array;
+				return res;
+			} else {
+				return res;
+			}
 		}
 
 		//wikibase_API あいまい(検索ワード,結果取得上限数)
@@ -503,42 +737,46 @@
 		}
 
 		//カテゴリー選択関数
-		function select_category(query_data, checklist, matchlist,) {
+		function select_category(id, query_data, checklist, matchlist,) {
 			let purpose_id = new Array();
 			let color = new Array();
+			//console.log(query_data);
+			for (let i of id) {
+				//console.log("id", i);
+				for (let q of query_data) {
+					//console.log(q);
+					let idx1 = Array.from(matchlist.values()).indexOf(q.o.value);
+					if ((idx1 != -1) && (q.s.value.indexOf(i) != -1)) {
 
-			for (let q of query_data) {
-				//console.log(q);
-				let idx1 = Array.from(matchlist.values()).indexOf(q.o.value);
+						//console.log('選択されたカテゴリー',Array.from(matchlist.values()));
+						//console.log('カテゴリーにマッチしたID', q);
+						//console.log(idx1);
 
-				if (idx1 != -1) {
-					//console.log('選択されたカテゴリー',Array.from(matchlist.values()));
-					//console.log('カテゴリーにマッチしたID', q);
-					//console.log(idx1);
+						purpose_id.push(q);
+						let idx2 = Array.from(checklist.values()).indexOf(Array.from(matchlist.entries())[idx1][0]);
+						reg = new RegExp("cat-\d(-\d)+", "g");
 
-					purpose_id.push(q);
-					let idx2 = Array.from(checklist.values()).indexOf(Array.from(matchlist.entries())[idx1][0]);
-					reg = new RegExp("cat-\d(-\d)+", "g");
+						if (idx2 != -1) {
+							//console.log(Array.from(checklist.values()));
+							//console.log(Array.from(matchlist.entries())[idx1][0]);
+							//console.log(idx2);
 
-					if (idx2 != -1) {
-						//console.log(Array.from(checklist.values()));
-						//console.log(Array.from(matchlist.entries())[idx1][0]);
-						//console.log(idx2);
+							let tmp;
+							if (reg.test(Array.from(checklist.entries())[idx2][0])) {
+								let tmp1 = Array.from(checklist.entries())[idx2][0].slice(5);
+								tmp = Array.from(checklist.entries())[idx2][0].replace(tmp1, "");
+							} else {
+								tmp = Array.from(checklist.entries())[idx2][0];
+							}
+							let idx3 = Object.keys(category_color).indexOf(tmp);
+							color.push(category_color['cat-' + idx3]);
 
-						let tmp;
-						if (reg.test(Array.from(checklist.entries())[idx2][0])) {
-							let tmp1 = Array.from(checklist.entries())[idx2][0].slice(5);
-							tmp = Array.from(checklist.entries())[idx2][0].replace(tmp1, "");
-						} else {
-							tmp = Array.from(checklist.entries())[idx2][0];
+							//console.log(Array.from(checklist.entries())[idx2][0]);
+							//console.log(idx3);
+							//console.log(category_color);
+							//console.log(category_color['cat-' + idx3]);
 						}
-						let idx3 = Object.keys(category_color).indexOf(tmp);
-						color.push(category_color['cat-' + idx3]);
 
-						//console.log(Array.from(checklist.entries())[idx2][0]);
-						//console.log(idx3);
-						//console.log(category_color);
-						//console.log(category_color['cat-' + idx3]);
 					}
 				}
 			}
@@ -562,9 +800,9 @@
 					+ 'select  DISTINCT ?s ?sLabel ?o ?oLabel \n'
 					+ 'where{ \n'
 					+ 'VALUES ?s {' + ids + '} \n'
-					+ '?s wdt:P31/wdt:P279* ?o.  \n'
-					+ 'SERVICE wikibase:label { bd:serviceParam wikibase:language "ja,en". }\n'
-					+ '}'
+					+ '?s wdt:P31*/wdt:P279* ?o.  \n'
+					+ 'SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],en". }\n'
+					+ '}ORDER BY ASC (?s)'
 				//console.log(query)
 
 				//SPARQLクエリの実行（sparql.jsで定義している関数を利用）
@@ -652,7 +890,17 @@
 
 			for (let i = 0; i < words.length; i++) {
 				let tmparray = new Array();
-				let dct = { "name": words[i].surface_form, "word_position": words[i].word_position };
+				let pos1 = {
+					"name": words[i].surface_form,
+					"pos_detail_1": words[i].pos_detail_1,
+					"pos_detail_2": words[i].pos_detail_2,
+					"pos_detail_3": words[i].pos_detail_3
+				};
+				let dct = {
+					"name": words[i].surface_form,
+					"word_position": words[i].word_position,
+					"pos": pos1
+				};
 				tmparray.push(dct);
 
 				position = words[i].word_position + words[i].surface_form.length;
@@ -664,7 +912,17 @@
 				let k = 0;
 				while ((j < words.length) && (position == words[j].word_position)) {
 					//console.log("次の単語位置", words[j].word_position);
-					dct = { "name": words[j].surface_form, "word_position": words[j].word_position };
+					let pos2 = {
+						"name": words[j].surface_form,
+						"pos_detail_1": words[j].pos_detail_1,
+						"pos_detail_2": words[j].pos_detail_2,
+						"pos_detail_3": words[j].pos_detail_3
+					};
+					let dct = {
+						"name": words[j].surface_form,
+						"word_position": words[j].word_position,
+						"pos": pos2
+					};
 					tmparray.push(dct);
 					position += words[j].surface_form.length;
 					k++;
@@ -681,13 +939,15 @@
 			return associated_nouns;
 		}
 
-		//(完全一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit)
-		async function full_three_words_or_more_behind(words, limit) {
+		//(完全一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function full_three_words_or_more_behind(words, limit, pos) {
 			let len = words.length;
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 1; i < len; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
@@ -698,19 +958,19 @@
 						tmpres.push(res1.search[i]);
 					}
 				}
-				if (tmpres.length != 0) {
-					res1.search = tmpres;
-				}
+				let res1search = label_type(tmpres);
+				res1.pos = tmppos;
 
 				//console.log(words_str, res1)
-				if (res1.search.length == 0) {
-					let res2 = await forward_three_words_or_more_behind(tmpwords, limit);
+				if (res1search.length == 0) {
+					let res2 = await full_three_words_or_more_behind(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
 						return 0;
 					}
-				} else if (res1.search.length != 0) {
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
 					return res1
 				}
 
@@ -718,16 +978,19 @@
 				return 0;
 			}
 		}
-		//(完全一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit)
-		async function full_three_words_or_more_forward(words, limit) {
+		//(完全一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function full_three_words_or_more_forward(words, limit, pos) {
 			let len = words.length;
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 0; i < len - 1; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
+				//console.log(res1);
 				res1.word_count = tmpwords.length;
 				let tmpres = new Array();
 				for (let i = 0; i < res1.search.length; i++) {
@@ -736,19 +999,21 @@
 					}
 				}
 				//console.log('完全一致', tmpres)
-				if (tmpres.length != 0) {
-					res1.search = tmpres;
-				}
 
-				//console.log(words_str, res1)
-				if (res1.search.length == 0) {
-					let res2 = await forward_three_words_or_more_forward(tmpwords, limit);
+				let res1search = label_type(tmpres);
+				res1.pos = tmppos;
+				//console.log(res1.pos);
+
+				//console.log(words_str, res1);
+				if (res1search.length == 0) {
+					let res2 = await full_three_words_or_more_forward(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
 						return 0;
 					}
-				} else if (res1.search.length != 0) {
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
 					return res1;
 				}
 
@@ -757,26 +1022,33 @@
 			}
 		}
 
-		//(前方一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit)
-		async function forward_three_words_or_more_behind(words, limit) {
+		//(前方一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function forward_three_words_or_more_behind(words, limit, pos) {
 			let len = words.length;
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 1; i < len; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
+				let res1search = label_type(res1.search);
+
 				res1.word_count = tmpwords.length;
-				console.log(words_str, res1)
-				if (res1.search.length == 0) {
-					let res2 = await forward_three_words_or_more_behind(tmpwords, limit);
+				res1.pos = tmppos;
+				//console.log(words_str, res1)
+
+				if (res1search.length == 0) {
+					let res2 = await forward_three_words_or_more_behind(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
 						return 0;
 					}
-				} else if (res1.search.length != 0) {
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
 					return res1;
 				}
 
@@ -784,26 +1056,33 @@
 				return 0;
 			}
 		}
-		//(前方一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit)
-		async function forward_three_words_or_more_forward(words, limit) {
+		//(前方一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function forward_three_words_or_more_forward(words, limit, pos) {
 			let len = words.length;
+			//console.log(pos);
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 0; i < len - 1; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
+				let res1search = label_type(res1.search);
+
 				res1.word_count = tmpwords.length;
-				console.log(words_str, res1)
+				res1.pos = tmppos;
+				//console.log(words_str, res1)
 				if (res1.search.length == 0) {
-					let res2 = await forward_three_words_or_more_forward(tmpwords, limit);
+					let res2 = await forward_three_words_or_more_forward(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
 						return 0;
 					}
 				} else if (res1.search.length != 0) {
+					res1.search = res1search;
 					return res1;
 				}
 
@@ -812,20 +1091,23 @@
 			}
 		}
 
-		//(あいまい)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit)
-		async function ambi_three_words_or_more_behind(words, limit) {
+		//(あいまい)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function ambi_three_words_or_more_behind(words, limit, pos) {
 			let len = words.length;
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 1; i < len; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_list_search(words_str, limit);
 				res1.word_count = tmpwords.length;
+				res1.pos = tmppos;
 				console.log(words_str, res1)
 				if (res1.query.search.length == 0) {
-					let res2 = await ambi_three_words_or_more_behind(tmpwords, limit);
+					let res2 = await ambi_three_words_or_more_behind(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
@@ -839,20 +1121,23 @@
 				return 0;
 			}
 		}
-		//(あいまい)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit)
-		async function ambi_three_words_or_more_forward(words, limit) {
+		//(あいまい)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function ambi_three_words_or_more_forward(words, limit, pos) {
 			let len = words.length;
 			if (len - 1 > 1) {
 				let tmpwords = new Array();
+				let tmppos = new Array();
 				for (let i = 0; i < len - 1; i++) {
 					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
 				}
 				let words_str = tmpwords.join('');
 				let res1 = await promise_get_list_search(words_str, limit);
 				res1.word_count = tmpwords.length;
+				res1.pos = tmppos;
 				console.log(words_str, res1)
 				if (res1.query.search.length == 0) {
-					let res2 = await ambi_three_words_or_more_forward(tmpwords, limit);
+					let res2 = await ambi_three_words_or_more_forward(tmpwords, limit, pos);
 					if (res2 != 0) {
 						return res2;
 					} else {
@@ -877,9 +1162,12 @@
 			if (info.length !== 0) {
 				if (Array.from(checklist.entries()).length != 0) {
 
+					let id = new Array();
 					let wikidata_ids = '';
 					//sparqlqeryの生成、問い合わせ
+					//console.log(info);
 					for (let j = 0; j < info.length; j++) {
+						id.push(info[j].id);
 						wikidata_ids += "wd:" + info[j].id + " ";
 					}
 					let query_data = await sparql_query(wikidata_ids);
@@ -888,32 +1176,36 @@
 					//console.log(Array.from(checklist.entries()).length);
 
 					//カテゴリーにマッチしたwikidataidと色の対応
-					let s_cat = select_category(query_data, checklist, matchlist);
+					let s_cat = select_category(id, query_data, checklist, matchlist);
 					//console.log(Array.isArray(s_cat[0]));
 					if (s_cat[0] !== undefined) {
+						//console.log(s_cat[0]);
 						wikidata_log.pop();
 						wikidata_log.push({ 'name': name, 'info': info, 'category': create_category(searched_category, query_data) });
 						//リンクテキストの生成
 						return ({
 							'name': name, 'word_position': word_position, 'wikidata_id': s_cat[0].s.value.replace("http://www.wikidata.org/entity/", ""), 'wikidataURL': s_cat[0].s.value
-							, 'link': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+							, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
 								+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
 								+ "'" + ');" style ="background:' + s_cat[1] + '">' + name + '</a></b>'
+							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
+								+ '" style="background:' + s_cat[1] + '" target="_blank">' + name + '</a></b>'
 						});
 					} else {
 						return ({
 							'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': info[0].concepturi
-							, 'link': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+							, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
 								+ info[0].title + "');" + '">' + name + '</a></b>'
-
+							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].title + '" target="_blank">' + name + '</a></b>'
 						});
 					}
 
 				} else {
 					return ({
 						'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': info[0].concepturi
-						, 'link': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+						, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
 							+ info[0].id + "');" + '">' + name + '</a></b>'
+						, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].id + '" target="_blank">' + name + '</a></b>'
 					});
 				}
 
@@ -929,16 +1221,18 @@
 			//APIの結果を整形し、SPARQLで問い合わせ
 			if (info.length !== 0) {
 				if (Array.from(checklist.entries()).length != 0) {
+					let id = new Array();
 					let wikidata_ids = '';
 					//sparqlqeryの生成、問い合わせ
 					for (let j = 0; j < info.length; j++) {
+						id.push(info[j].title);
 						wikidata_ids += "wd:" + info[j].title + " ";
 					}
 					query_data = await sparql_query(wikidata_ids);
 					//console.log("クエリの結果", query_data);
 					SPARQL_log.push({ 'name': name, 'SPARQL': query_data });
 					//カテゴリーにマッチしたwikidataidと色の対応
-					let s_cat = select_category(query_data, checklist, matchlist);
+					let s_cat = select_category(id, query_data, checklist, matchlist);
 					//console.log(Array.isArray(s_cat[0]));
 					if (s_cat[0] !== undefined) {
 						wikidata_log.pop();
@@ -946,22 +1240,26 @@
 						//リンクテキストの生成
 						return ({
 							'name': name, 'word_position': word_position, 'wikidta_id': s_cat[0].s.value.replace("http://www.wikidata.org/entity/", ""), 'wikidataURL': s_cat[0].s.value
-							, 'link': '<b><a href="javascript:ShowDetails('
+							, 'kgslink': '<b><a href="javascript:ShowDetails('
 								+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "") + "'" + ');"'
 								+ 'style ="background:' + s_cat[1] + '">' + name + '</a></b>'
+							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
+								+ '" style ="background:' + s_cat[1] + '" target=_"blank">' + name + '</a></b>'
 						});
 					} else {
 						return ({
 							'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': 'http://www.wikidata.org/entity/' + info[0].title
-							, 'link': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+							, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
 								+ info[0].title + "');" + '">' + name + '</a></b>'
+							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].title + '" target="_blank">' + name + '</a></b>'
 						});
 					}
 				} else {
 					return ({
 						'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': 'http://www.wikidata.org/entity/' + info[0].title
-						, 'link': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
+						, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
 							+ info[0].title + "');" + '">' + name + '</a></b>'
+						, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].title + '" target="_blank">' + name + '</a></b>'
 					});
 				}
 			}
@@ -1026,7 +1324,7 @@
 			link.click();
 		}
 
-		//時間呼び出し
+		//csvダウンロードファイル名の時間呼び出し
 		function times() {
 			var now = new Date();
 
@@ -1072,7 +1370,7 @@
 		function example2() {
 			var textarea = document.getElementById('input_text');
 			textarea.value = "日本国（にほんこく、にっぽんこく、英: Japan）、または日本（にほん、にっぽん）は、東アジアに位置する民主制国家[1]。首都は東京都[注 2][2][3]。"
-				+ "\n"
+				+ "\n\n"
 				+ "全長3500キロメートル以上にわたる国土は、主に日本列島[注 6]および千島列島・南西諸島・伊豆諸島・小笠原諸島などの弧状列島により構成され[3][4]、大部分が温帯に属するが、"
 				+ "北部や島嶼部では亜寒帯や熱帯の地域がある[5][6]。地形は起伏に富み、火山地・丘陵を含む山地の面積は国土の約75 % を占め[6]、沿岸の平野部に人口が集中している。国内には行政区分"
 				+ "として47の都道府県があり、日本人（大和民族・琉球民族・アイヌ民族[注 7]・外国系の人々）と外国人が居住し、日本語を通用する[2][3]。"
@@ -1086,13 +1384,19 @@
 				+ "陸生植物に関しては栽培・農耕、哺乳類に関しては畜産、そのうち乳牛などは酪農、ニワトリに関しては養鶏、ブタは養豚という用語がある。"
 			//console.log(document.getElementById('input_text').value);
 		}
+		//デバッグ用例文
+		function example4() {
+			var textarea = document.getElementById('input_text');
+			textarea.value = "ゲティスバーグ方面作戦の初め1863年6月9日に、北軍アルフレッド・プレソントン少将の騎兵隊と南軍J・E・B・スチュアート少将の騎兵隊との間の戦いだった。";
+			//console.log(document.getElementById('input_text').value);
+		}
 
 
 	</script>
 </head>
 
 <body>
-	<h1>Wikidataによる文章アノテーションシステム</h1>
+	<h1>Wikidataのクラス階層を用いたエンティティリンキング</h1>
 	<hr>
 	<main>
 		<h3>
@@ -1159,6 +1463,14 @@
 						<label><input type="radio" id="LabelAmbi" name="labelType" value="ambi">あいまい検索</label><br>
 						<label>ラベル取得上限数 <input type="text" id="APIlimit" value="10" size="3"></label><br><br>
 
+						<b>ラベルのマッチ項目設定(完全一致検索、前方一致検索のみ)</b>:<br>
+						<label><input type="radio" id="TypeLavelpriority" name="labelmatchType" value="labelpriority"
+								checked>ラベル名優先</label><br>
+						<label><input type="radio" id="TypeLavel" name="labelmatchType" value="label">ラベル名のみ</label><br>
+						<label><input type="radio" id="TypeAlias" name="labelmatchType" value="alias">別名のみ</label><br>
+						<label><input type="radio" id="TypeDefault" name="labelmatchType"
+								value="default">どちらも</label><br><br>
+
 						<b>品詞の選択</b>:<br>
 						<label>
 							<input type="radio" name="radio_noun" value="u_noun">固有名詞のみ
@@ -1167,15 +1479,20 @@
 							<input type="radio" name="radio_noun" value="noun">名詞のみ
 						</label><br>
 						<label>
-							<input type="radio" name="radio_noun" value="noun_w" checked>名詞ホワイトリスト
+							<input type="radio" name="radio_noun" value="noun_w">名詞ホワイトリスト
 						</label><br>
 						<input type="text" id="noun_w" size="40" value="固有名詞,一般,サ変接続"><br>
 						<label>
-							<input type="radio" name="radio_noun" value="noun_b">名詞ブラックリスト</label><br>
-						<input type="text" id="noun_b" size="40" value="数,代名詞,非自立,形容動詞語幹,副詞可能"><br><br>
+							<input type="radio" name="radio_noun" value="noun_b" checked>名詞ブラックリスト</label><br>
+						<input type="text" id="noun_b" size="40" value="接続詞的,代名詞,非自立,特殊,形容動詞語幹"><br><br>
 
 						<b>NGワード</b><br>
-						<input type="text" id="NGtext" size="40" value="[,],][,]、,:,(,),注"><br><br>
+						<input type="text" id="NGtext" size="40" value="[,],][,]、,:,(,),注,.,_,英,&quot;"><br><br>
+
+						<b>リンク先表示方法</b><br>
+						<label><input type="radio" id="kgs" name="linkType" value="kgs"
+								checked>KGSearchForWD</label><br>
+						<label><input type="radio" id="wikidata" name="linkType" value="wikidata">wikidata</label><br>
 					</p>
 				</div>
 
