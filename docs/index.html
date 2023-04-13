@@ -64,7 +64,7 @@
 				//フィルタリング後の形態素解析結果
 				var words = new Array();
 				//サーチAPIの結果取得上限数
-				var APIlimit = document.getElementById('APIlimit').value;
+				const APIlimit = document.getElementById('APIlimit').value;
 				//リンクテキスト
 				var linked_string = new Array();
 				//API検索結果のカテゴリ一覧
@@ -127,12 +127,12 @@
 						let tmp_array = new Array();
 						for (const element of tmp_person_name_array[i]) {
 							tmp_array.push({
-								name: element.surface_form, 
+								name: element.surface_form,
 								word_position: element.word_position,
 								pos: {
-									name: element.surface_form, 
+									name: element.surface_form,
 									pos_detail_1: element.pos_detail_1,
-									pos_detail_2: element.pos_detail_2, 
+									pos_detail_2: element.pos_detail_2,
 									pos_detail_3: element.pos_detail_3
 								}
 							})
@@ -179,6 +179,259 @@
 
 
 					console.log("wikidata検索ワード", words);
+					//--------------------------------------------START 複合語検索--------------------------------------------------------------------------------------
+					async function exactMatchSearch(fukugougoArray, search_word_str, searchWordArray, search_word_pos, APIlimit) {
+						let fukugou_APIres = new Array();
+						if (2 < fukugougoArray.length) {
+							//三単語以上の複合語をAPIで検索
+
+							let res0 = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
+							let tmpres = new Array();
+							for (let j = 0; j < res0.search.length; j++) {
+								if (res0.search[j].match.text == search_word_str) {
+									tmpres.push(res0.search[j]);
+								}
+							}
+							let res0search = label_type(tmpres);
+							//console.log(res0.searchinfo.search, res0);
+							if (res0search.length != 0) {
+								fukugou_APIres.push({
+									'name': res0.searchinfo.search,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': res0search,
+									"pos": search_word_pos
+								});
+							} else if (res0search.length == 0) {	//検索結果が見つからなかった場合分割して検索
+
+								//まずは後ろを塊にして検索
+								let res1 = await full_three_words_or_more_behind(searchWordArray, APIlimit, search_word_pos);
+								if (res1 == 0) {
+
+									//今度は前を塊にして検索
+									let res2 = await full_three_words_or_more_forward(searchWordArray, APIlimit, search_word_pos);
+									if (res2 == 0) {
+										//0が返ってきた場合複合語での検索結果は見つかっていない
+										console.log(search_word_str, "は検索結果無");
+									} else if (res2 != 0) {
+
+										if (res2.search.length != 0) {
+											fukugou_APIres.push({
+												'name': res2.searchinfo.search,
+												'word_position': fukugougoArray[0].word_position,
+												'word_count': res2.word_count,
+												'search': res2.search,
+												'pos': res2.pos
+											});
+										}
+									}
+
+								} else if (res1 != 0) {
+									if (res1.search.length != 0) {
+										let word_position;
+										for (let j = 0; j < fukugougoArray.length; j++) {
+											if (res1.searchinfo.search.indexOf(fukugougoArray[j].name) == 0) {
+												word_position = fukugougoArray[j].word_position;
+											}
+										}
+
+										fukugou_APIres.push({
+											'name': res1.searchinfo.search,
+											'word_position': word_position,
+											'word_count': res1.word_count,
+											'search': res1.search,
+											'pos': res1.pos
+										});
+									}
+								}
+							}
+						} else {
+							//二単語の複合語の検索
+
+							let res = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
+							let tmpres = new Array();
+							for (let j = 0; j < res.search.length; j++) {
+								if (res.search[j].match.text == search_word_str) {
+									tmpres.push(res.search[j]);
+								}
+							}
+							//console.log(tmpres);
+							let ressearch = label_type(tmpres);
+							if (ressearch.length != 0) {
+								fukugou_APIres.push({
+									'name': res.searchinfo.search,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': ressearch,
+									'pos': search_word_pos
+								});
+							} else {
+								console.log(search_word_str, 'は検索結果無')
+							}
+						}
+						return fukugou_APIres;
+					}
+
+					async function prefixSearch(fukugougoArray, search_word_str, searchWordArray, search_word_pos, APIlimit) {
+						let fukugou_APIres = new Array();
+						if (2 < fukugougoArray.length) {
+							//三単語以上の複合語をAPIで検索
+
+							let res0 = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
+							res0.word_count = searchWordArray.length;
+							//console.log(res0.searchinfo.search, res0);
+
+							let res0search = label_type(res0.search);
+							if (res0search.length != 0) {
+								fukugou_APIres.push({
+									'name': res0.searchinfo.search,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': res0search,
+									'spos': search_word_pos
+								});
+
+							} else if (res0.search.length == 0) { //検索結果が見つからなかった場合分割して検索
+
+								//まずは後ろを塊にして検索
+								let res1 = await forward_three_words_or_more_behind(searchWordArray, APIlimit, search_word_pos);
+								if (res1 == 0) {
+
+									//今度は前を塊にして検索
+									let res2 = await forward_three_words_or_more_forward(searchWordArray, APIlimit, search_word_pos);
+									if (res2 == 0) {
+										//0が返ってきた場合複合語での検索結果は見つかっていない
+										console.log(search_word_str, "は検索結果無");
+									} else if (res2 != 0) {
+										if (res2.search.length != 0) {
+											fukugou_APIres.push({
+												'name': res2.searchinfo.search,
+												'word_position': fukugougoArray[0].word_position,
+												'word_count': res2.word_count,
+												'search': res2.search,
+												'pos': res2.pos
+											});
+										}
+									}
+
+								} else if (res1 != 0) {
+									if (res1.search.length != 0) {
+										let word_position;
+										for (let j = 0; j < fukugougoArray.length; j++) {
+											if (res1.searchinfo.search.indexOf(fukugougoArray[j].name) == 0) {
+												word_position = fukugougoArray[j].word_position;
+											}
+										}
+
+										fukugou_APIres.push({
+											'name': res1.searchinfo.search,
+											'word_position': word_position,
+											'word_count': res1.word_count,
+											'search': res1.search,
+											'pos': res1.pos
+										});
+									}
+								}
+							}
+
+						} else {
+							//二単語の複合語の検索
+
+							let res = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
+							let ressearch = label_type(res.search);
+							if (ressearch.length != 0) {
+								fukugou_APIres.push({
+									'name': res.searchinfo.search,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': ressearch,
+									'pos': search_word_pos
+								});
+							} else {
+								console.log(search_word_str, 'は検索結果無')
+							}
+						}
+						return fukugou_APIres;
+					}
+
+					async function ambiguousSearch(fukugougoArray, search_word_str, searchWordArray, search_word_pos, APIlimit) {
+						let fukugou_APIres = new Array();
+						if (2 < fukugougoArray.length) {
+							//三単語以上の複合語をAPIで検索
+
+							let res0 = await promise_get_list_search(search_word_str, APIlimit);
+							res0.word_count = searchWordArray.length;
+							console.log(search_word_str, res0);
+
+							if (res0.query.search.length != 0) {
+								fukugou_APIres.push({
+									'name': search_word_str,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': res0.query.search,
+									'pos': search_word_pos
+								});
+
+							} else if (res0.query.search.length == 0) { //検索結果が見つからなかった場合分割して検索
+
+								//まずは後ろを塊にして検索
+								let res1 = await ambi_three_words_or_more_behind(searchWordArray, APIlimit, search_word_pos);
+								if (res1 == 0) {
+
+									//今度は前を塊にして検索
+									let res2 = await ambi_three_words_or_more_forward(searchWordArray, APIlimit, search_word_pos);
+									if (res2 == 0) {
+										//0が返ってきた場合複合語での検索結果は見つかっていない
+										console.log(search_word_str, "は検索結果無");
+									} else if (res2 != 0) {
+										if (res2.query.search.length != 0) {
+											fukugou_APIres.push({
+												'name': search_word_str,
+												'word_position': fukugougoArray[0].word_position,
+												'word_count': res2.word_count,
+												'search': res2.query.search,
+												"pos": res2.pos
+											});
+										}
+									}
+
+								} else if (res1 != 0) {
+									if (res1.query.search.length != 0) {
+										const num = searchWordArray.length - res1.word_count;
+										const word_position = fukugougoArray[num].word_position;
+
+										fukugou_APIres.push({
+											'name': search_word_str,
+											'word_position': word_position,
+											'word_count': res1.word_count,
+											'search': res1.query.search,
+											'pos': res1.pos
+										});
+									}
+								}
+							}
+
+						} else {
+							//二単語の複合語の検索
+
+							let res = await promise_get_list_search(search_word_str, APIlimit);
+							//console.log(res);
+							if (res.query.search.length != 0) {
+								fukugou_APIres.push({
+									'name': search_word_str,
+									'word_position': fukugougoArray[0].word_position,
+									'word_count': fukugougoArray.length,
+									'search': res.query.search,
+									'pos': search_word_pos
+								});
+							} else {
+								console.log(search_word_str, 'は検索結果無')
+							}
+						}
+						return fukugou_APIres;
+					}
+
+
 
 					//複合語の取り出して検索
 					let fukugougo = associated_noun(words);
@@ -187,253 +440,19 @@
 					console.log("複合語", fukugougo);
 
 					if (fukugougo.length != 0) {
-						var fukugou_APIres = new Array();
+						let fukugou_APIres = [];
 
 						for (let i = 0; i < fukugougo.length; i++) {
-							let search_word = fukugougo[i].map(obj => obj.name);
-							let search_word_str = search_word.join('');
+							let searchWordArray = fukugougo[i].map(obj => obj.name);
+							let search_word_str = searchWordArray.join('');
 							let search_word_pos = fukugougo[i].map(obj => obj.pos);
 
 							if (searchtype == "Full") {
-								if (2 < fukugougo[i].length) {
-									//三単語以上の複合語をAPIで検索
-
-									let res0 = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
-									let tmpres = new Array();
-									for (let j = 0; j < res0.search.length; j++) {
-										if (res0.search[j].match.text == search_word_str) {
-											tmpres.push(res0.search[j]);
-										}
-									}
-									let res0search = label_type(tmpres);
-									//console.log(res0.searchinfo.search, res0);
-									if (res0search.length != 0) {
-										fukugou_APIres.push({
-											'name': res0.searchinfo.search,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': res0search,
-											"pos": search_word_pos
-										});
-									} else if (res0search.length == 0) {	//検索結果が見つからなかった場合分割して検索
-
-										//まずは後ろを塊にして検索
-										let res1 = await full_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
-										if (res1 == 0) {
-
-											//今度は前を塊にして検索
-											let res2 = await full_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
-											if (res2 == 0) {
-												//0が返ってきた場合複合語での検索結果は見つかっていない
-												console.log(search_word_str, "は検索結果無");
-											} else if (res2 != 0) {
-
-												if (res2.search.length != 0) {
-													fukugou_APIres.push({
-														'name': res2.searchinfo.search,
-														'word_position': fukugougo[i][0].word_position,
-														'word_count': res2.word_count,
-														'search': res2.search,
-														'pos': res2.pos
-													});
-												}
-											}
-
-										} else if (res1 != 0) {
-											if (res1.search.length != 0) {
-												let word_position;
-												for (let j = 0; j < fukugougo[i].length; j++) {
-													if (res1.searchinfo.search.indexOf(fukugougo[i][j].name) == 0) {
-														word_position = fukugougo[i][j].word_position;
-													}
-												}
-
-												fukugou_APIres.push({
-													'name': res1.searchinfo.search,
-													'word_position': word_position,
-													'word_count': res1.word_count,
-													'search': res1.search,
-													'pos': res1.pos
-												});
-											}
-										}
-									}
-								} else {
-									//二単語の複合語の検索
-
-									let res = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
-									let tmpres = new Array();
-									for (let j = 0; j < res.search.length; j++) {
-										if (res.search[j].match.text == search_word_str) {
-											tmpres.push(res.search[j]);
-										}
-									}
-									//console.log(tmpres);
-									let ressearch = label_type(tmpres);
-									if (ressearch.length != 0) {
-										fukugou_APIres.push({
-											'name': res.searchinfo.search,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': ressearch,
-											'pos': search_word_pos
-										});
-									} else {
-										console.log(search_word_str, 'は検索結果無')
-									}
-								}
+								fukugou_APIres = [...fukugou_APIres, ...(await exactMatchSearch(fukugougo[i], search_word_str, searchWordArray, search_word_pos, APIlimit))];
 							} else if (searchtype == "forward") {
-								if (2 < fukugougo[i].length) {
-									//三単語以上の複合語をAPIで検索
-
-									let res0 = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
-									res0.word_count = search_word.length;
-									//console.log(res0.searchinfo.search, res0);
-
-									let res0search = label_type(res0.search);
-									if (res0search.length != 0) {
-										fukugou_APIres.push({
-											'name': res0.searchinfo.search,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': res0search,
-											'pos': search_word_pos
-										});
-
-									} else if (res0.search.length == 0) { //検索結果が見つからなかった場合分割して検索
-
-										//まずは後ろを塊にして検索
-										let res1 = await forward_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
-										if (res1 == 0) {
-
-											//今度は前を塊にして検索
-											let res2 = await forward_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
-											if (res2 == 0) {
-												//0が返ってきた場合複合語での検索結果は見つかっていない
-												console.log(search_word_str, "は検索結果無");
-											} else if (res2 != 0) {
-												if (res2.search.length != 0) {
-													fukugou_APIres.push({
-														'name': res2.searchinfo.search,
-														'word_position': fukugougo[i][0].word_position,
-														'word_count': res2.word_count,
-														'search': res2.search,
-														'pos': res2.pos
-													});
-												}
-											}
-
-										} else if (res1 != 0) {
-											if (res1.search.length != 0) {
-												let word_position;
-												for (let j = 0; j < fukugougo[i].length; j++) {
-													if (res1.searchinfo.search.indexOf(fukugougo[i][j].name) == 0) {
-														word_position = fukugougo[i][j].word_position;
-													}
-												}
-
-												fukugou_APIres.push({
-													'name': res1.searchinfo.search,
-													'word_position': word_position,
-													'word_count': res1.word_count,
-													'search': res1.search,
-													'pos': res1.pos
-												});
-											}
-										}
-									}
-
-								} else {
-									//二単語の複合語の検索
-
-									let res = await promise_get_action_wbsearchentities(search_word_str, APIlimit);
-									let ressearch = label_type(res.search);
-									if (ressearch.length != 0) {
-										fukugou_APIres.push({
-											'name': res.searchinfo.search,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': ressearch,
-											'pos': search_word_pos
-										});
-									} else {
-										console.log(search_word_str, 'は検索結果無')
-									}
-								}
-
+								fukugou_APIres = [...fukugou_APIres, ...(await prefixSearch(fukugougo[i], search_word_str, searchWordArray, search_word_pos, APIlimit))];
 							} else if (searchtype == "ambi") {
-								if (2 < fukugougo[i].length) {
-									//三単語以上の複合語をAPIで検索
-
-									let res0 = await promise_get_list_search(search_word_str, APIlimit);
-									res0.word_count = search_word.length;
-									console.log(search_word_str, res0);
-
-									if (res0.query.search.length != 0) {
-										fukugou_APIres.push({
-											'name': search_word_str,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': res0.query.search,
-											'pos': search_word_pos
-										});
-
-									} else if (res0.query.search.length == 0) { //検索結果が見つからなかった場合分割して検索
-
-										//まずは後ろを塊にして検索
-										let res1 = await ambi_three_words_or_more_behind(search_word, APIlimit, search_word_pos);
-										if (res1 == 0) {
-
-											//今度は前を塊にして検索
-											let res2 = await ambi_three_words_or_more_forward(search_word, APIlimit, search_word_pos);
-											if (res2 == 0) {
-												//0が返ってきた場合複合語での検索結果は見つかっていない
-												console.log(search_word_str, "は検索結果無");
-											} else if (res2 != 0) {
-												if (res2.query.search.length != 0) {
-													fukugou_APIres.push({
-														'name': search_word_str,
-														'word_position': fukugougo[i][0].word_position,
-														'word_count': res2.word_count,
-														'search': res2.query.search,
-														"pos": res2.pos
-													});
-												}
-											}
-
-										} else if (res1 != 0) {
-											if (res1.query.search.length != 0) {
-												const num = search_word.length - res1.word_count;
-												const word_position = fukugougo[i][num].word_position;
-
-												fukugou_APIres.push({
-													'name': search_word_str,
-													'word_position': word_position,
-													'word_count': res1.word_count,
-													'search': res1.query.search,
-													'pos': res1.pos
-												});
-											}
-										}
-									}
-
-								} else {
-									//二単語の複合語の検索
-
-									let res = await promise_get_list_search(search_word_str, APIlimit);
-									//console.log(res);
-									if (res.query.search.length != 0) {
-										fukugou_APIres.push({
-											'name': search_word_str,
-											'word_position': fukugougo[i][0].word_position,
-											'word_count': fukugougo[i].length,
-											'search': res.query.search,
-											'pos': search_word_pos
-										});
-									} else {
-										console.log(search_word_str, 'は検索結果無')
-									}
-								}
+								fukugou_APIres = [...fukugou_APIres, ...(await ambiguousSearch(fukugougo[i], search_word_str, searchWordArray, search_word_pos, APIlimit))];
 							}
 						}
 						console.log("複合語検索結果", fukugou_APIres);
@@ -484,6 +503,7 @@
 						//console.log(fukugou_linked_string);
 
 					}
+					//--------------------------------------------END 複合語検索--------------------------------------------------------------------------------------
 
 					var linked_string = new Array();
 					for (let i = 0; i < words.length; i++) {

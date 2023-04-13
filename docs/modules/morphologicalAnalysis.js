@@ -1,10 +1,11 @@
-//辞書（dictフォルダへのパス）
-const DICT_PATH = "../jscss\kuromoji.js";
 
-const ids = [];
-const names = [];
 
-async function morphologicalAnalysis(text){
+async function morphologicalAnalysis(text) {
+    //辞書（dictフォルダへのパス）
+    const DICT_PATH = "../jscss\kuromoji.js";
+
+    const ids = [];
+    const names = [];
     return new Promise((resolve) => {
         // Kuromoji
         kuromoji.builder({ dicPath: DICT_PATH }).build((err, tokenizer) => {
