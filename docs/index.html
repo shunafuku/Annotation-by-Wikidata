@@ -837,11 +837,11 @@
 		function sparql_query(ids) {
 			return new Promise((resolve) => {
 				//SPARQLエンドポイントの初期設定
-				var endpoint = "https://query.wikidata.org/sparql";
+				const endpoint = "https://query.wikidata.org/sparql";
 
 				//SPARQLクエリの発行
 				//idsにsearchAPIで返ってきた「Q???」を全て代入
-				var query = 'PREFIX wdt: <http://www.wikidata.org/prop/direct/> \n'
+				const query = 'PREFIX wdt: <http://www.wikidata.org/prop/direct/> \n'
 					+ 'PREFIX wd: <http://www.wikidata.org/entity/> \n'
 					+ 'select  DISTINCT ?s ?sLabel ?o ?oLabel \n'
 					+ 'where{ \n'
@@ -1354,7 +1354,7 @@
 
 		//csv関数
 		function csvdownload(result) {
-			var str = '';
+			let str = '';
 			for (let i = 0; i < result.length; i++) {
 				if (i == 0) {
 					str += Object.keys(result[i]) + '\r\n';
@@ -1362,9 +1362,9 @@
 				str += Object.values(result[i]) + '\r\n';
 			}
 
-			var bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
-			var blob = new Blob([bom, str], { type: "text/csv" }); //配列に上記の文字列(str)を設定
-			var link = document.createElement('a');
+			const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+			const blob = new Blob([bom, str], { type: "text/csv" }); //配列に上記の文字列(str)を設定
+			let link = document.createElement('a');
 			link.href = URL.createObjectURL(blob);
 			link.download = result[0].name + '_' + times() + ".csv";
 			link.click();
@@ -1372,14 +1372,14 @@
 
 		//csvダウンロードファイル名の時間呼び出し
 		function times() {
-			var now = new Date();
+			const now = new Date();
 
-			var Year = now.getFullYear();
-			var Month = now.getMonth() + 1;
-			var date = now.getDate();
-			var Hour = now.getHours();
-			var Min = now.getMinutes();
-			var Sec = now.getSeconds();
+			const Year = now.getFullYear();
+			const Month = now.getMonth() + 1;
+			const date = now.getDate();
+			const Hour = now.getHours();
+			const Min = now.getMinutes();
+			const Sec = now.getSeconds();
 
 			return (Month + "月" + date + "日" + Hour + "時" + Min + "分" + Sec + "秒");
 		}
@@ -1390,7 +1390,7 @@
 			if (msg === undefined) msg = "";
 
 			// 画面表示メッセージを埋め込み
-			var innerMsg = "<div id='innerMsg'>" + msg + "</div>";
+			const innerMsg = "<div id='innerMsg'>" + msg + "</div>";
 
 			// ローディング画像が非表示かどうかチェックし、非表示の場合のみ出力。
 			if ($("#nowLoading").length == 0) {
