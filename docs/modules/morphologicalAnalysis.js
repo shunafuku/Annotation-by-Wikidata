@@ -18,10 +18,11 @@ async function morphologicalAnalysis(text) {
 
 //kuromoji形態素解析(解析文章)
 function promise_analysis(text) {
-    //kuromoji必要変数
+    //辞書（dictフォルダへのパス）
+    const DICT_PATH = "./dict";
+
     const ids = [];
     const names = [];
-    const DICT_PATH = "./dict";
     return new Promise((resolve) => {
         // Kuromoji
         kuromoji.builder({ dicPath: DICT_PATH }).build((err, tokenizer) => {
