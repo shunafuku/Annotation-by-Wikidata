@@ -1096,11 +1096,11 @@
 		function match_blacklist(blacklist, target) {
 			let list = new Array();
 			for (let i = 0; i < target.length; i++) {
-				let pos1 = blacklist.some((word) => word == target[i].pos_detail_1);
-				let pos2 = blacklist.some((word) => word == target[i].pos_detail_2);
-				let pos3 = blacklist.some((word) => word == target[i].pos_detail_3);
+				let existPos1 = blacklist.some((word) => word == target[i].pos_detail_1);
+				let existPos2 = blacklist.some((word) => word == target[i].pos_detail_2);
+				let existPos3 = blacklist.some((word) => word == target[i].pos_detail_3);
 
-				if ((pos1 || pos2 || pos3) == false) {
+				if ((existPos1 || existPos2 || existPos3) == false) {
 					list.push(target[i]);
 				}
 			}
