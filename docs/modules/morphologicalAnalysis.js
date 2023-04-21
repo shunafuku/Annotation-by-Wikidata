@@ -1,6 +1,6 @@
 async function morphologicalAnalysis(text) {
     //辞書（dictフォルダへのパス）
-    const DICT_PATH = "../jscss\kuromoji.js";
+    const DICT_PATH = "../dict";
 
     const ids = [];
     const names = [];
