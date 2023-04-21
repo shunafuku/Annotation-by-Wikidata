@@ -588,19 +588,8 @@
 			//SPARQLQUERYの総合ログ
 			var SPARQL_log = new Array();
 
-			//フィルタリング後の形態素解析結果
-			var words = new Array();
-
-			//サーチAPIの結果取得上限数
-			const APIlimit = document.getElementById('APIlimit').value;
-
 			//API検索結果のカテゴリ一覧
 			var searched_category = new Array();
-
-			//詳細設定ラジオボタン
-			const select_noun = radio_value('radio_noun');
-			const searchtype = radio_value('labelType');
-			const linktype = radio_value('linkType');
 
 			//カテゴリーチェックボックス結果
 			let checklist = new Map();
@@ -643,16 +632,27 @@
 			}
 			console.log('カテゴリ名 → wikidata_url', matchlist);
 
-			//入力テキスト取得
+			//--------------------------------設定情報を取得--------------------------------
+			//サーチAPIの結果取得上限数
+			const APIlimit = document.getElementById('APIlimit').value;
+			//詳細設定ラジオボタン
+			const select_noun = radio_value('radio_noun');
+			const searchtype = radio_value('labelType');
+			const linktype = radio_value('linkType');
+
+			//--------------------------------入力テキスト取得--------------------------------
 			const textINPUT = document.getElementById('input_text').value;
+
+			//--------------------------------形態素解析--------------------------------
 			//kuoromoji形態素解析結果の格納
 			var tokens = await promise_analysis(textINPUT);
 
-			//人物名の抽出
+			//--------------------------------START 形態素解析結果から、必要なものを抽出--------------------------------
+			var words = new Array(); //フィルタリング後の形態素解析結果
+			//----------------人物名----------------
 			const tmp_person_name_array = person_name(tokens);
 			//console.log('人物名', tmp_person_name_array);
-
-			//複合語の配列と同じ型に変換
+			//複合語の配列と同じ形式に変換
 			let person_name_array = new Array();
 			for (let i = 0; i < tmp_person_name_array.length; i++) {
 				let tmp_array = new Array();
@@ -671,7 +671,7 @@
 				person_name_array.push(tmp_array);
 			}
 			console.log('人物名', person_name_array);
-
+			//----------------名詞----------------
 			tokens.forEach((token) => {
 				// 解析結果を順番に取得する
 				if (select_noun == "u_noun") {
@@ -690,7 +690,7 @@
 			words.sort(function (a, b) {
 				return a.word_position - b.word_position;
 			});
-
+			//----------------ブラックリスト ホワイトリスト----------------
 			//ブラックリストかホワイトリストを使用するか判定
 			if (select_noun == 'noun_w' || select_noun == 'noun_b') {
 				const nounvalue = document.getElementById(select_noun).value;
@@ -709,7 +709,8 @@
 			});
 
 			console.log("wikidata検索ワード", words);
-			//--------------------------------------------START 複合語検索--------------------------------------------------------------------------------------
+			//--------------------------------END 形態素解析結果から、必要なものを抽出--------------------------------
+			//--------------------------------START 複合語検索--------------------------------
 			//複合語の取り出して検索
 			let fukugougo = associated_noun(words);
 			//複合語配列と人物名配列の結合
@@ -784,11 +785,11 @@
 			//used linked_string
 			let linked_string = new Array();
 			for (let i = 0; i < words.length; i++) {
-				let judge;
+				let judge = false;
 				if (fukugou_linked_string != null) {
 					judge = fukugou_linked_string.some((data) => data.word_position == words[i].word_position);
 				}
-				if (judge === true) {
+				if (judge) {
 					let index = fukugou_linked_string.findIndex(({ word_position }) => word_position == words[i].word_position);
 					i += (fukugou_linked_string[index].word_count - 1);
 
