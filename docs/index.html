@@ -275,6 +275,278 @@
 			return fukugou_APIres;
 		}
 	</script>
+	<!-- 複合語関連の関数 -->
+	<script>
+		//複合語の取り出し
+		function associated_noun(words) {
+			let position;
+			let associated_nouns = new Array();
+			let j = 0;
+
+			for (let i = 0; i < words.length; i++) {
+				let tmparray = new Array();
+				let pos1 = {
+					"name": words[i].surface_form,
+					"pos_detail_1": words[i].pos_detail_1,
+					"pos_detail_2": words[i].pos_detail_2,
+					"pos_detail_3": words[i].pos_detail_3
+				};
+				let dct = {
+					"name": words[i].surface_form,
+					"word_position": words[i].word_position,
+					"pos": pos1
+				};
+				tmparray.push(dct);
+
+				position = words[i].word_position + words[i].surface_form.length;
+				//console.log("一番目の単語位置", words[i].word_position, "次の単語位置(予測)", position);
+
+				j = i + 1;
+				//console.log(i, j);
+
+				let k = 0;
+				while ((j < words.length) && (position == words[j].word_position)) {
+					//console.log("次の単語位置", words[j].word_position);
+					let pos2 = {
+						"name": words[j].surface_form,
+						"pos_detail_1": words[j].pos_detail_1,
+						"pos_detail_2": words[j].pos_detail_2,
+						"pos_detail_3": words[j].pos_detail_3
+					};
+					let dct = {
+						"name": words[j].surface_form,
+						"word_position": words[j].word_position,
+						"pos": pos2
+					};
+					tmparray.push(dct);
+					position += words[j].surface_form.length;
+					k++;
+					j++;
+				}
+				i += k;
+				if (1 < tmparray.length) {
+					associated_nouns.push(tmparray);
+					//console.log(tmparray);
+				}
+
+			}
+			//console.log("複合語(名詞と名詞)", associated_nouns);
+			return associated_nouns;
+		}
+
+		//(完全一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function full_three_words_or_more_behind(wordsArray, searchLimit, partOfSpeech) {
+			let len = wordsArray.length;
+			if (len - 1 > 1) {
+				let tmpWordsArray = new Array();
+				let tmpPartOfSpeech = new Array();
+				for (let i = 1; i < len; i++) {
+					tmpWordsArray.push(wordsArray[i]);
+					tmpPartOfSpeech.push(partOfSpeech[i]);
+				}
+				let compoundWord = tmpWordsArray.join('');
+				let res1 = await promise_get_action_wbsearchentities(compoundWord, searchLimit);
+				res1.word_count = tmpWordsArray.length;
+				let tmpres = new Array();
+				for (let i = 0; i < res1.search.length; i++) {
+					if (res1.search[i].match.text == compoundWord) {
+						tmpres.push(res1.search[i]);
+					}
+				}
+				let res1search = label_type(tmpres);
+				res1.pos = tmpPartOfSpeech;
+
+				//console.log(compoundWord, res1)
+				if (res1search.length == 0) {
+					let res2 = await full_three_words_or_more_behind(tmpWordsArray, searchLimit, partOfSpeech);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
+					return res1
+				}
+
+			} else {
+				return 0;
+			}
+		}
+		//(完全一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function full_three_words_or_more_forward(wordsArray, searchLimit, partOfSpeech) {
+			let len = wordsArray.length;
+			if (len - 1 > 1) {
+				let tmpWordsArray = new Array();
+				let tmpPartOfSpeech = new Array();
+				for (let i = 0; i < len - 1; i++) {
+					tmpWordsArray.push(wordsArray[i]);
+					tmpPartOfSpeech.push(partOfSpeech[i]);
+				}
+				let compoundWord = tmpWordsArray.join('');
+				let res1 = await promise_get_action_wbsearchentities(compoundWord, searchLimit);
+				//console.log(res1);
+				res1.word_count = tmpWordsArray.length;
+				let tmpres = new Array();
+				for (let i = 0; i < res1.search.length; i++) {
+					if (res1.search[i].match.text == compoundWord) {
+						tmpres.push(res1.search[i]);
+					}
+				}
+				//console.log('完全一致', tmpres)
+
+				let res1search = label_type(tmpres);
+				res1.pos = tmpPartOfSpeech;
+				//console.log(res1.pos);
+
+				//console.log(compoundWord, res1);
+				if (res1search.length == 0) {
+					let res2 = await full_three_words_or_more_forward(tmpWordsArray, searchLimit, partOfSpeech);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
+					return res1;
+				}
+
+			} else {
+				return 0;
+			}
+		}
+
+		//(前方一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function forward_three_words_or_more_behind(words, limit, pos) {
+			let len = words.length;
+			if (len - 1 > 1) {
+				let tmpwords = new Array();
+				let tmppos = new Array();
+				for (let i = 1; i < len; i++) {
+					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
+				}
+				let words_str = tmpwords.join('');
+				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
+				let res1search = label_type(res1.search);
+
+				res1.word_count = tmpwords.length;
+				res1.pos = tmppos;
+				//console.log(words_str, res1)
+
+				if (res1search.length == 0) {
+					let res2 = await forward_three_words_or_more_behind(tmpwords, limit, pos);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1search.length != 0) {
+					res1.search = res1search;
+					return res1;
+				}
+
+			} else {
+				return 0;
+			}
+		}
+		//(前方一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function forward_three_words_or_more_forward(words, limit, pos) {
+			let len = words.length;
+			//console.log(pos);
+			if (len - 1 > 1) {
+				let tmpwords = new Array();
+				let tmppos = new Array();
+				for (let i = 0; i < len - 1; i++) {
+					tmpwords.push(words[i]);
+					tmppos.push(pos[i]);
+				}
+				let words_str = tmpwords.join('');
+				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
+				let res1search = label_type(res1.search);
+
+				res1.word_count = tmpwords.length;
+				res1.pos = tmppos;
+				//console.log(words_str, res1)
+				if (res1.search.length == 0) {
+					let res2 = await forward_three_words_or_more_forward(tmpwords, limit, pos);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1.search.length != 0) {
+					res1.search = res1search;
+					return res1;
+				}
+
+			} else {
+				return 0;
+			}
+		}
+
+		//(あいまい)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
+		async function ambi_three_words_or_more_behind(wordsArray, searchLimit, partOfSpeech) {
+			let len = wordsArray.length;
+			if (len - 1 > 1) {
+				let tmpWordsArray = new Array();
+				let tmpPartOfSpeech = new Array();
+				for (let i = 1; i < len; i++) {
+					tmpWordsArray.push(wordsArray[i]);
+					tmpPartOfSpeech.push(partOfSpeech[i]);
+				}
+				let compoundWord = tmpWordsArray.join('');
+				let res1 = await promise_get_list_search(compoundWord, searchLimit);
+				res1.word_count = tmpWordsArray.length;
+				res1.pos = tmpPartOfSpeech;
+				console.log(compoundWord, res1)
+				if (res1.query.search.length == 0) {
+					let res2 = await ambi_three_words_or_more_behind(tmpWordsArray, searchLimit, partOfSpeech);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1.query.search.length != 0) {
+					return res1;
+				}
+
+			} else {
+				return 0;
+			}
+		}
+		//(あいまい)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
+		async function ambi_three_words_or_more_forward(wordsArray, searchLimit, partOfSpeech) {
+			let len = wordsArray.length;
+			if (len - 1 > 1) {
+				let tmpWordsArray = new Array();
+				let tmpPartOfSpeech = new Array();
+				for (let i = 0; i < len - 1; i++) {
+					tmpWordsArray.push(wordsArray[i]);
+					tmpPartOfSpeech.push(partOfSpeech[i]);
+				}
+				let compoundWord = tmpWordsArray.join('');
+				let res1 = await promise_get_list_search(compoundWord, searchLimit);
+				res1.word_count = tmpWordsArray.length;
+				res1.pos = tmpPartOfSpeech;
+				console.log(compoundWord, res1)
+				if (res1.query.search.length == 0) {
+					let res2 = await ambi_three_words_or_more_forward(tmpWordsArray, searchLimit, partOfSpeech);
+					if (res2 != 0) {
+						return res2;
+					} else {
+						return 0;
+					}
+				} else if (res1.query.search.length != 0) {
+					return res1;
+				}
+
+			} else {
+				return 0;
+			}
+		}
+	</script>
 	<!-- main以外の関数 -->
 	<script>
 
@@ -308,7 +580,7 @@
 			return person_name_array;
 		}
 
-		
+
 	</script>
 	<!-- main関数 -->
 	<script>
@@ -886,275 +1158,7 @@
 			return list;
 		}
 
-		//複合語の取り出し
-		function associated_noun(words) {
-			let position;
-			let associated_nouns = new Array();
-			let j = 0;
 
-			for (let i = 0; i < words.length; i++) {
-				let tmparray = new Array();
-				let pos1 = {
-					"name": words[i].surface_form,
-					"pos_detail_1": words[i].pos_detail_1,
-					"pos_detail_2": words[i].pos_detail_2,
-					"pos_detail_3": words[i].pos_detail_3
-				};
-				let dct = {
-					"name": words[i].surface_form,
-					"word_position": words[i].word_position,
-					"pos": pos1
-				};
-				tmparray.push(dct);
-
-				position = words[i].word_position + words[i].surface_form.length;
-				//console.log("一番目の単語位置", words[i].word_position, "次の単語位置(予測)", position);
-
-				j = i + 1;
-				//console.log(i, j);
-
-				let k = 0;
-				while ((j < words.length) && (position == words[j].word_position)) {
-					//console.log("次の単語位置", words[j].word_position);
-					let pos2 = {
-						"name": words[j].surface_form,
-						"pos_detail_1": words[j].pos_detail_1,
-						"pos_detail_2": words[j].pos_detail_2,
-						"pos_detail_3": words[j].pos_detail_3
-					};
-					let dct = {
-						"name": words[j].surface_form,
-						"word_position": words[j].word_position,
-						"pos": pos2
-					};
-					tmparray.push(dct);
-					position += words[j].surface_form.length;
-					k++;
-					j++;
-				}
-				i += k;
-				if (1 < tmparray.length) {
-					associated_nouns.push(tmparray);
-					//console.log(tmparray);
-				}
-
-			}
-			//console.log("複合語(名詞と名詞)", associated_nouns);
-			return associated_nouns;
-		}
-
-		//(完全一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
-		async function full_three_words_or_more_behind(wordsArray, searchLimit, partOfSpeech) {
-			let len = wordsArray.length;
-			if (len - 1 > 1) {
-				let tmpWordsArray = new Array();
-				let tmpPartOfSpeech = new Array();
-				for (let i = 1; i < len; i++) {
-					tmpWordsArray.push(wordsArray[i]);
-					tmpPartOfSpeech.push(partOfSpeech[i]);
-				}
-				let compoundWord = tmpWordsArray.join('');
-				let res1 = await promise_get_action_wbsearchentities(compoundWord, searchLimit);
-				res1.word_count = tmpWordsArray.length;
-				let tmpres = new Array();
-				for (let i = 0; i < res1.search.length; i++) {
-					if (res1.search[i].match.text == compoundWord) {
-						tmpres.push(res1.search[i]);
-					}
-				}
-				let res1search = label_type(tmpres);
-				res1.pos = tmpPartOfSpeech;
-
-				//console.log(compoundWord, res1)
-				if (res1search.length == 0) {
-					let res2 = await full_three_words_or_more_behind(tmpWordsArray, searchLimit, partOfSpeech);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1search.length != 0) {
-					res1.search = res1search;
-					return res1
-				}
-
-			} else {
-				return 0;
-			}
-		}
-		//(完全一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
-		async function full_three_words_or_more_forward(wordsArray, searchLimit, partOfSpeech) {
-			let len = wordsArray.length;
-			if (len - 1 > 1) {
-				let tmpWordsArray = new Array();
-				let tmpPartOfSpeech = new Array();
-				for (let i = 0; i < len - 1; i++) {
-					tmpWordsArray.push(wordsArray[i]);
-					tmpPartOfSpeech.push(partOfSpeech[i]);
-				}
-				let compoundWord = tmpWordsArray.join('');
-				let res1 = await promise_get_action_wbsearchentities(compoundWord, searchLimit);
-				//console.log(res1);
-				res1.word_count = tmpWordsArray.length;
-				let tmpres = new Array();
-				for (let i = 0; i < res1.search.length; i++) {
-					if (res1.search[i].match.text == compoundWord) {
-						tmpres.push(res1.search[i]);
-					}
-				}
-				//console.log('完全一致', tmpres)
-
-				let res1search = label_type(tmpres);
-				res1.pos = tmpPartOfSpeech;
-				//console.log(res1.pos);
-
-				//console.log(compoundWord, res1);
-				if (res1search.length == 0) {
-					let res2 = await full_three_words_or_more_forward(tmpWordsArray, searchLimit, partOfSpeech);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1search.length != 0) {
-					res1.search = res1search;
-					return res1;
-				}
-
-			} else {
-				return 0;
-			}
-		}
-
-		//(前方一致)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
-		async function forward_three_words_or_more_behind(words, limit, pos) {
-			let len = words.length;
-			if (len - 1 > 1) {
-				let tmpwords = new Array();
-				let tmppos = new Array();
-				for (let i = 1; i < len; i++) {
-					tmpwords.push(words[i]);
-					tmppos.push(pos[i]);
-				}
-				let words_str = tmpwords.join('');
-				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
-				let res1search = label_type(res1.search);
-
-				res1.word_count = tmpwords.length;
-				res1.pos = tmppos;
-				//console.log(words_str, res1)
-
-				if (res1search.length == 0) {
-					let res2 = await forward_three_words_or_more_behind(tmpwords, limit, pos);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1search.length != 0) {
-					res1.search = res1search;
-					return res1;
-				}
-
-			} else {
-				return 0;
-			}
-		}
-		//(前方一致)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
-		async function forward_three_words_or_more_forward(words, limit, pos) {
-			let len = words.length;
-			//console.log(pos);
-			if (len - 1 > 1) {
-				let tmpwords = new Array();
-				let tmppos = new Array();
-				for (let i = 0; i < len - 1; i++) {
-					tmpwords.push(words[i]);
-					tmppos.push(pos[i]);
-				}
-				let words_str = tmpwords.join('');
-				let res1 = await promise_get_action_wbsearchentities(words_str, limit);
-				let res1search = label_type(res1.search);
-
-				res1.word_count = tmpwords.length;
-				res1.pos = tmppos;
-				//console.log(words_str, res1)
-				if (res1.search.length == 0) {
-					let res2 = await forward_three_words_or_more_forward(tmpwords, limit, pos);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1.search.length != 0) {
-					res1.search = res1search;
-					return res1;
-				}
-
-			} else {
-				return 0;
-			}
-		}
-
-		//(あいまい)三つ以上の複合語の後方検索処理(複合語リスト,APIlimit,品詞)
-		async function ambi_three_words_or_more_behind(wordsArray, searchLimit, partOfSpeech) {
-			let len = wordsArray.length;
-			if (len - 1 > 1) {
-				let tmpWordsArray = new Array();
-				let tmpPartOfSpeech = new Array();
-				for (let i = 1; i < len; i++) {
-					tmpWordsArray.push(wordsArray[i]);
-					tmpPartOfSpeech.push(partOfSpeech[i]);
-				}
-				let compoundWord = tmpWordsArray.join('');
-				let res1 = await promise_get_list_search(compoundWord, searchLimit);
-				res1.word_count = tmpWordsArray.length;
-				res1.pos = tmpPartOfSpeech;
-				console.log(compoundWord, res1)
-				if (res1.query.search.length == 0) {
-					let res2 = await ambi_three_words_or_more_behind(tmpWordsArray, searchLimit, partOfSpeech);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1.query.search.length != 0) {
-					return res1;
-				}
-
-			} else {
-				return 0;
-			}
-		}
-		//(あいまい)三つ以上の複合語の前方検索処理(複合語リスト,APIlimit,品詞)
-		async function ambi_three_words_or_more_forward(wordsArray, searchLimit, partOfSpeech) {
-			let len = wordsArray.length;
-			if (len - 1 > 1) {
-				let tmpWordsArray = new Array();
-				let tmpPartOfSpeech = new Array();
-				for (let i = 0; i < len - 1; i++) {
-					tmpWordsArray.push(wordsArray[i]);
-					tmpPartOfSpeech.push(partOfSpeech[i]);
-				}
-				let compoundWord = tmpWordsArray.join('');
-				let res1 = await promise_get_list_search(compoundWord, searchLimit);
-				res1.word_count = tmpWordsArray.length;
-				res1.pos = tmpPartOfSpeech;
-				console.log(compoundWord, res1)
-				if (res1.query.search.length == 0) {
-					let res2 = await ambi_three_words_or_more_forward(tmpWordsArray, searchLimit, partOfSpeech);
-					if (res2 != 0) {
-						return res2;
-					} else {
-						return 0;
-					}
-				} else if (res1.query.search.length != 0) {
-					return res1;
-				}
-
-			} else {
-				return 0;
-			}
-		}
 
 		//カテゴリーのマッチメイキング、リンクテキストの生成(検索単語, APIres.search, 単語の位置, checklist, matchlist, 結果格納配列,ログ格納用配列)
 		async function create_linked_string_forward(name, info, word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log) {
@@ -1243,7 +1247,7 @@
 						wikidata_log.push({ 'name': name, 'info': info, 'category': create_category(searched_category, query_data) });
 						//リンクテキストの生成
 						return ({
-							'name': name, 'word_position': word_position, 'wikidta_id': s_cat[0].s.value.replace("http://www.wikidata.org/entity/", ""), 'wikidataURL': s_cat[0].s.value
+							'name': name, 'word_position': word_position, 'wikidata_id': s_cat[0].s.value.replace("http://www.wikidata.org/entity/", ""), 'wikidataURL': s_cat[0].s.value
 							, 'kgslink': '<b><a href="javascript:ShowDetails('
 								+ "'https://kgs.hozo.jp/sample/details.html?key=wd:" + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "") + "'" + ');"'
 								+ 'style ="background:' + s_cat[1] + '">' + name + '</a></b>'
