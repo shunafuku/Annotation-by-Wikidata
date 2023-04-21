@@ -550,8 +550,6 @@
 	<!-- main以外の関数 -->
 	<script>
 
-
-
 		//人物名の抽出
 		function person_name(tokens) {
 			let person_name_array = new Array();
@@ -579,7 +577,6 @@
 			}
 			return person_name_array;
 		}
-
 
 	</script>
 	<!-- main関数 -->
@@ -611,7 +608,6 @@
 
 			//最終結果を格納する変数
 			let textOUTPUT = '';
-
 
 			//カテゴリーチェックボックス階層
 			const CATcheckbox = document.getElementsByClassName('hierarchy0');
@@ -712,7 +708,6 @@
 				return a.word_position - b.word_position;
 			});
 
-
 			console.log("wikidata検索ワード", words);
 			//--------------------------------------------START 複合語検索--------------------------------------------------------------------------------------
 			//複合語の取り出して検索
@@ -738,7 +733,6 @@
 					}
 				}
 				console.log("複合語検索結果", fukugou_APIres);
-
 
 				if (searchtype == 'ambi') {
 					for (let i = 0; i < fukugou_APIres.length; i++) {
@@ -822,7 +816,6 @@
 							//used linked_string
 							linked_string.push(sparqlres);
 						}
-
 
 					} else if (searchtype == "forward") {
 
@@ -949,7 +942,6 @@
 				delete CSVLOG[i].link;
 			}
 
-
 			//検索結果のカテゴリー表示エリア
 			const resultArea0 = document.getElementById('result_category');
 			resultArea0.innerHTML = '<H2>カテゴリー</H2>' + searched_category;
@@ -984,8 +976,6 @@
 		isShowQuery = true;//「クエリ表示」ボタンを表示するか？（サービス公開時はfalseにするとよい）
 		var CSVLOG;//csv出力用のグローバル変数
 
-
-
 		window.addEventListener('load', () => {
 
 			//例文の呼び出し
@@ -1002,16 +992,10 @@
 				//アノテーション実行
 				main();
 
-
 			}, false);
 		}, false);
 
 		//カテゴリーチェック関数()
-
-
-
-
-
 
 		//ラベルのマッチタイプのフィルター
 		function label_type(res) {
@@ -1043,8 +1027,6 @@
 				return res;
 			}
 		}
-
-
 
 		//カテゴリー選択関数
 		function select_category(id, query_data, checklist, matchlist,) {
@@ -1097,8 +1079,6 @@
 			return res;
 		}
 
-
-
 		//検索結果カテゴリー作成用関数(サーチ後のカテゴリ一覧,sparqlqerydata)
 		function create_category(category, data) {
 			//下のコードでサーチ後のカテゴリー作成
@@ -1111,7 +1091,6 @@
 			}
 			return OLABEL;
 		}
-
 
 		//ブラックリストの照会をして、削除したものを返す(ブラックリスト,形態素解析結果（名詞）)
 		function match_blacklist(blacklist, target) {
@@ -1157,8 +1136,6 @@
 			}
 			return list;
 		}
-
-
 
 		//カテゴリーのマッチメイキング、リンクテキストの生成(検索単語, APIres.search, 単語の位置, checklist, matchlist, 結果格納配列,ログ格納用配列)
 		async function create_linked_string_forward(name, info, word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log) {
@@ -1219,7 +1196,6 @@
 
 			}
 		}
-
 
 		async function create_linked_string_ambi(name, info, word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log) {
 
