@@ -132,7 +132,7 @@
 						'word_position': fukugougoArray[0].word_position,
 						'word_count': fukugougoArray.length,
 						'search': res0search,
-						'spos': search_word_pos
+						'pos': search_word_pos
 					});
 
 				} else if (res0.search.length == 0) { //検索結果が見つからなかった場合分割して検索
@@ -796,17 +796,20 @@
 				} else {
 					//検索対象のwikidataid
 					let wikidata_ids = '';
-
 					if (searchtype == "Full") {
-
 						//前方一致でAPIでwikidataに問い合わせ
 						let APIresponse = await promise_get_action_wbsearchentities(words[i].surface_form, APIlimit);
 						//console.log("サーチAPI結果(前方一致)", APIresponse);
 						let name = APIresponse.searchinfo.search;
 						let info = new Array();
-						for (let j = 0; j < APIresponse.search.length; j++) {
-							if (APIresponse.search[j].match.text == words[i].surface_form) {
-								info.push(APIresponse.search[j]);
+						// for (let j = 0; j < APIresponse.search.length; j++) {
+						// 	if (APIresponse.search[j].match.text == words[i].surface_form) {
+						// 		info.push(APIresponse.search[j]);
+						// 	}
+						// }
+						for (let search of APIresponse.search) {
+							if (search.match.text == words[i].surface_form) {
+								info.push(search);
 							}
 						}
 						if (info.length != 0) {
@@ -817,9 +820,7 @@
 							//used linked_string
 							linked_string.push(sparqlres);
 						}
-
 					} else if (searchtype == "forward") {
-
 						//前方一致でAPIでwikidataに問い合わせ
 						let APIresponse = await promise_get_action_wbsearchentities(words[i].surface_form, APIlimit);
 						if (APIresponse.search.length != 0) {
@@ -831,7 +832,6 @@
 							//used linked_string
 							linked_string.push(sparqlres);
 						}
-
 					} else if (searchtype == "ambi") {
 						//あいまいでAPIでwikidataに問い合わせ
 						let APIresponse = await promise_get_list_search(words[i].surface_form, APIlimit)
@@ -1138,6 +1138,10 @@
 			return list;
 		}
 
+		function createWikidataLinkHtmlStr(wikidataUrl, className, value) {
+
+			return '<b>' + ('<a '('href="' + link + '" ') + ('class="' + className + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + value + '</a>') + '</b>';
+		}
 		//カテゴリーのマッチメイキング、リンクテキストの生成(検索単語, APIres.search, 単語の位置, checklist, matchlist, 結果格納配列,ログ格納用配列)
 		async function create_linked_string_forward(name, info, word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log) {
 
@@ -1168,30 +1172,53 @@
 						//console.log(s_cat[0]);
 						wikidata_log.pop();
 						wikidata_log.push({ 'name': name, 'info': info, 'category': create_category(searched_category, query_data) });
+						const wikidataId = s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "");
+						const wikidataUrl = s_cat[0].s.value;
+						const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + (' style="' + 'background:' + s_cat[1] + '"') + '>' + name + '</a></b>';
+						const link = 'https://www.wikidata.org/wiki/' + wikidataId;
+						const linkHtml = '<b>' + ('<a '('href="' + link + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						//リンクテキストの生成
 						return ({
-							'name': name, 'word_position': word_position, 'wikidata_id': s_cat[0].s.value.replace("http://www.wikidata.org/entity/", ""), 'wikidataURL': s_cat[0].s.value
-							, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-								+ s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
-								+ "'" + ');" style ="background:' + s_cat[1] + '">' + name + '</a></b>'
-							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "")
-								+ '" style="background:' + s_cat[1] + '" target="_blank">' + name + '</a></b>'
+							'name': name,
+							'word_position': word_position,
+							'wikidata_id': wikidataId,
+							'wikidataURL': wikidataUrl,
+							'kgslink': kgsLinkHtml,
+							'link': linkHtml
 						});
 					} else {
+						const wikidataId = info[0].title;
+						const wikidataUrl = info[0].concepturi;
+						const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + '>' + name + '</a></b>';
+						const link = 'https://www.wikidata.org/wiki/' + wikidataId;
+						const linkHtml = '<b>' + ('<a '('href="' + link + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						return ({
-							'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': info[0].concepturi
-							, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-								+ info[0].title + "');" + '">' + name + '</a></b>'
-							, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].title + '" target="_blank">' + name + '</a></b>'
+							'name': name,
+							'word_position': word_position,
+							'wikidata_id': wikidataId,
+							'wikidataURL': wikidataUrl,
+							'kgslink': kgsLinkHtml,
+							'link': linkHtml
 						});
 					}
-
 				} else {
+					const wikidataId = info[0].title;
+					const wikidataUrl = info[0].concepturi;
+					const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+					const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + '>' + name + '</a></b>';
+					const link = 'https://www.wikidata.org/wiki/' + wikidataId;
+					const linkHtml = '<b>' + ('<a ' + ('href="' + link + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+					console.log("タイトル" + info[0].title);
+					console.log("id" + info[0].id);
 					return ({
-						'name': name, 'word_position': word_position, 'wikidata_id': info[0].title, 'wikidataURL': info[0].concepturi
-						, 'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:"
-							+ info[0].id + "');" + '">' + name + '</a></b>'
-						, 'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].id + '" target="_blank">' + name + '</a></b>'
+						'name': name,
+						'word_position': word_position,
+						'wikidata_id': info[0].title,
+						'wikidataURL': info[0].concepturi,
+						'kgslink': '<b><a href="javascript:ShowDetails(' + "'https://kgs.hozo.jp/sample/details.html?key=wd:" + info[0].id + "');" + '">' + name + '</a></b>',
+						'link': '<b><a href="https://www.wikidata.org/wiki/' + info[0].id + '" target="_blank">' + name + '</a></b>'
 					});
 				}
 
