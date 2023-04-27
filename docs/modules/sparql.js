@@ -10,7 +10,7 @@ async function fetchSparql(endpointUrl, sparqlQuery) {
 
 //wikidata sparql endpoint(wikidataID:Q???)
 function sparql_query(ids) {
-    return new Promise((resolve) => {
+    return new Promise(async(resolve) => {
         //SPARQLエンドポイントの初期設定
         const endpoint = "https://query.wikidata.org/sparql";
 
@@ -27,7 +27,7 @@ function sparql_query(ids) {
         //console.log(query)
 
         //SPARQLクエリの実行（sparql.jsで定義している関数を利用）
-        qr = sendQuery(endpoint, query);
+        qr = await fetchSparql(endpoint, query);
 
         qr.fail(//クエリが失敗したときの処理
             function (xhr, textStatus, thrownError) {

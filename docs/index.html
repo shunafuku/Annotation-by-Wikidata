@@ -18,6 +18,9 @@
 	<script src="./modules/search.js"></script>
 	<script src="./modules/sparql.js"></script>
 	<script src="./modules/loading.js"></script>
+	<!-- new css -->
+	<link rel="stylesheet" href="styles/categoryColor.css">
+
 	<title>Wikidataのクラス階層を用いたエンティティリンキング</title>
 	<!-- 複合語の検索用関数 -->
 	<script>
@@ -1142,6 +1145,9 @@
 
 			return '<b>' + ('<a '('href="' + link + '" ') + ('class="' + className + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + value + '</a>') + '</b>';
 		}
+		function convertWikidataId2KgsLink(wikidataId) {
+			return 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+		}
 		//カテゴリーのマッチメイキング、リンクテキストの生成(検索単語, APIres.search, 単語の位置, checklist, matchlist, 結果格納配列,ログ格納用配列)
 		async function create_linked_string_forward(name, info, word_position, checklist, matchlist, searched_category, wikidata_log, SPARQL_log) {
 
@@ -1174,10 +1180,10 @@
 						wikidata_log.push({ 'name': name, 'info': info, 'category': create_category(searched_category, query_data) });
 						const wikidataId = s_cat[0].s.value.replace("http://www.wikidata.org/entity/", "");
 						const wikidataUrl = s_cat[0].s.value;
-						const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+						const kgsLink = convertWikidataId2KgsLink(wikidataId);
 						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + (' style="' + 'background:' + s_cat[1] + '"') + '>' + name + '</a></b>';
-						const link = 'https://www.wikidata.org/wiki/' + wikidataId;
-						const linkHtml = '<b>' + ('<a '('href="' + link + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+						const wikidataLink = s_cat[0].s.value;
+						const wikidataLinkHtml = '<b>' + ('<a '('href="' + wikidataLink + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						//リンクテキストの生成
 						return ({
 							'name': name,
@@ -1185,31 +1191,31 @@
 							'wikidata_id': wikidataId,
 							'wikidataURL': wikidataUrl,
 							'kgslink': kgsLinkHtml,
-							'link': linkHtml
+							'link': wikidataLinkHtml
 						});
 					} else {
 						const wikidataId = info[0].title;
 						const wikidataUrl = info[0].concepturi;
-						const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+						const kgsLink = convertWikidataId2KgsLink(wikidataId);
 						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + '>' + name + '</a></b>';
-						const link = 'https://www.wikidata.org/wiki/' + wikidataId;
-						const linkHtml = '<b>' + ('<a '('href="' + link + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+						const wikidataLink = 'https://www.wikidata.org/wiki/' + wikidataId;
+						const wikidataLinkHtml = '<b>' + ('<a '('href="' + wikidataLink + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						return ({
 							'name': name,
 							'word_position': word_position,
 							'wikidata_id': wikidataId,
 							'wikidataURL': wikidataUrl,
 							'kgslink': kgsLinkHtml,
-							'link': linkHtml
+							'link': wikidataLinkHtml
 						});
 					}
 				} else {
 					const wikidataId = info[0].title;
 					const wikidataUrl = info[0].concepturi;
-					const kgsLink = 'https://kgs.hozo.jp/sample/details.html?key=wd:' + wikidataId;
+					const kgsLink = convertWikidataId2KgsLink(wikidataId);
 					const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + '>' + name + '</a></b>';
-					const link = 'https://www.wikidata.org/wiki/' + wikidataId;
-					const linkHtml = '<b>' + ('<a ' + ('href="' + link + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+					const wikidataLink = 'https://www.wikidata.org/wiki/' + wikidataId;
+					const wikidataLinkHtml = '<b>' + ('<a ' + ('href="' + wikidataLink + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 					console.log("タイトル" + info[0].title);
 					console.log("id" + info[0].id);
 					return ({
@@ -1365,43 +1371,43 @@
 			<ul class="treeview">
 				<b>カテゴリー</b>:<br>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-0" value="activity">
-					<label for="cat-0" style="background:rgb(255, 143, 143)" #>活動</label>
+					<label for="cat-0" class="category-0">活動</label>
 					<ul>
 						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-0" value="game">
-							<label for="cat-0-0" style="background:rgb(255, 143, 143)">ゲーム</label>
+							<label for="cat-0-0" class="category-0">ゲーム</label>
 						</li>
 						<li class="expandable"><input class="hierarchy1" type="checkbox" id="cat-0-1" value="sport">
-							<label for="cat-0-1" style="background:rgb(255, 143, 143)">スポーツ</label>
+							<label for="cat-0-1" class="category-0">スポーツ</label>
 						</li>
 					</ul>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-1"
-						value="class of anatomical entity"> <label for="cat-1"
-						style="background:gainsboro">解剖学的構造</label>
+						value="class of anatomical entity"> <label for="cat-1" class="category-1">解剖学的構造</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-2" value="disease">
-					<label for="cat-2" style="background:rgb(117, 214, 161)">疾患</label>
+					<label for="cat-2" class="category-2">疾患</label>
 				</li>
-				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-3" value="drug"> <label
-						for="cat-3" style="background:yellow">薬</label></li>
+				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-3" value="drug">
+					<label for="cat-3" class="category-3">薬</label>
+				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-4" value="organisation">
-					<label for="cat-4" style="background:rgb(204, 179, 255)">組織</label>
+					<label for="cat-4" class="category-4">組織</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-5" value="person">
-					<label for="cat-5" style="background:orange">人物</label>
+					<label for="cat-5" class="category-5">人物</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-6" value="place">
-					<label for="cat-6" style="background:peachpuff">場所</label>
+					<label for="cat-6" class="category-6">場所</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-7" value="chemical substance">
-					<label for="cat-7" style="background:aqua">化学物質</label>
+					<label for="cat-7" class="category-7">化学物質</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-8"
 						value="group or class of organisms">
-					<label for="cat-8" style="background:lime">生物</label>
+					<label for="cat-8" class="category-8">生物</label>
 				</li>
 				<li class="expandable"><input class="hierarchy0" type="checkbox" id="cat-9" value="work">
-					<label for="cat-9" style="background:pink">仕事</label>
+					<label for="cat-9" class="category-9">仕事</label>
 				</li>
 			</ul>
 		</div>
