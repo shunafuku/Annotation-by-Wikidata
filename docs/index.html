@@ -976,8 +976,8 @@
 
 		const keylink = "item";	//リンクのkeyとする変数
 		const detail_html = "details.html"; //詳細表示用のHTMLファイル
-		detailsType = "window";//詳細表示の表示先("window":別Window，"iframe":iframeで同一画面，"blank":別タブ)
-		isShowQuery = true;//「クエリ表示」ボタンを表示するか？（サービス公開時はfalseにするとよい）
+		const detailsType = "window";//詳細表示の表示先("window":別Window，"iframe":iframeで同一画面，"blank":別タブ)
+		const isShowQuery = true;//「クエリ表示」ボタンを表示するか？（サービス公開時はfalseにするとよい）
 		var CSVLOG;//csv出力用のグローバル変数
 
 		window.addEventListener('load', () => {
@@ -1034,6 +1034,7 @@
 
 		//カテゴリー選択関数
 		function select_category(id, query_data, checklist, matchlist,) {
+			console.log("select_category")
 			let purpose_id = new Array();
 			let color = new Array();
 			//console.log(query_data);
@@ -1079,6 +1080,7 @@
 			//console.log(purpose_id);
 			//console.log(color);
 			let res = [purpose_id[0], color[0]];
+			console.log("neko: " +res)
 
 			return res;
 		}
@@ -1166,8 +1168,9 @@
 						id.push(info[j].id);
 						wikidata_ids += "wd:" + info[j].id + " ";
 					}
-					let query_data = await sparql_query(wikidata_ids);
-					//console.log("クエリの結果", query_data);
+					const query_result = await sparql_query(wikidata_ids);
+					let query_data = query_result['results']['bindings'];
+					console.log("クエリの結果", query_data);
 					SPARQL_log.push({ 'name': name, 'SPARQL': query_data });
 					//console.log(Array.from(checklist.entries()).length);
 
@@ -1183,7 +1186,7 @@
 						const kgsLink = convertWikidataId2KgsLink(wikidataId);
 						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + (' style="' + 'background:' + s_cat[1] + '"') + '>' + name + '</a></b>';
 						const wikidataLink = s_cat[0].s.value;
-						const wikidataLinkHtml = '<b>' + ('<a '('href="' + wikidataLink + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+						const wikidataLinkHtml = '<b>' + ('<a ' + ('href="' + wikidataLink + '" ') + ('style="background:' + s_cat[1] + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						//リンクテキストの生成
 						return ({
 							'name': name,
@@ -1199,7 +1202,7 @@
 						const kgsLink = convertWikidataId2KgsLink(wikidataId);
 						const kgsLinkHtml = '<b><a ' + ('href="' + "javascript:ShowDetails('" + kgsLink + "');" + '"') + '>' + name + '</a></b>';
 						const wikidataLink = 'https://www.wikidata.org/wiki/' + wikidataId;
-						const wikidataLinkHtml = '<b>' + ('<a '('href="' + wikidataLink + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
+						const wikidataLinkHtml = '<b>' + ('<a ' + ('href="' + wikidataLink + '" ') + 'target="_blank">' + name + '</a>') + '</b>';
 						return ({
 							'name': name,
 							'word_position': word_position,
@@ -1246,7 +1249,8 @@
 						id.push(info[j].title);
 						wikidata_ids += "wd:" + info[j].title + " ";
 					}
-					query_data = await sparql_query(wikidata_ids);
+					const query_result = await sparql_query(wikidata_ids);
+					let query_data = query_result['results']['bindings'];
 					//console.log("クエリの結果", query_data);
 					SPARQL_log.push({ 'name': name, 'SPARQL': query_data });
 					//カテゴリーにマッチしたwikidataidと色の対応
@@ -1285,8 +1289,8 @@
 
 		//詳細設定のラジオボタン値取得(ラジオボタン名)
 		function radio_value(name) {
-			let elements = document.getElementsByName(name);
-			let len = elements.length;
+			const elements = document.getElementsByName(name);
+			const len = elements.length;
 			let checkValue = '';
 
 			for (let i = 0; i < len; i++) {

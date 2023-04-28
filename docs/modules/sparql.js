@@ -9,8 +9,7 @@ async function fetchSparql(endpointUrl, sparqlQuery) {
 };
 
 //wikidata sparql endpoint(wikidataID:Q???)
-function sparql_query(ids) {
-    return new Promise(async(resolve) => {
+async function sparql_query(ids) {
         //SPARQLエンドポイントの初期設定
         const endpoint = "https://query.wikidata.org/sparql";
 
@@ -27,19 +26,6 @@ function sparql_query(ids) {
         //console.log(query)
 
         //SPARQLクエリの実行（sparql.jsで定義している関数を利用）
-        qr = await fetchSparql(endpoint, query);
-
-        qr.fail(//クエリが失敗したときの処理
-            function (xhr, textStatus, thrownError) {
-                //alert("Error: A '" + textStatus + "' occurred.");
-            }
-        );
-        qr.done(//クエリが成功したときの処理
-            function (d) {
-                //console.log(d);
-                return resolve(d.results.bindings);
-            }
-        );
-    })
+        return await fetchSparql(endpoint, query);
 
 }
