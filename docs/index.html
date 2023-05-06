@@ -951,13 +951,13 @@
         //used linked_string
         let linked_string = new Array();
         for (let i = 0; i < words.length; i++) {
-          let judge = false;
+          let isCompoundWordPositionOverlap = false;
           if (fukugou_linked_string != null) {
-            judge = fukugou_linked_string.some(
+            isCompoundWordPositionOverlap = fukugou_linked_string.some(
               (data) => data.word_position == words[i].word_position
             );
           }
-          if (judge) {
+          if (isCompoundWordPositionOverlap) {
             let index = fukugou_linked_string.findIndex(
               ({ word_position }) => word_position == words[i].word_position
             );
@@ -1076,7 +1076,7 @@
             const idList = self.map((item) => item["wikidata_id"]);
             //console.log(item.wikidata_id);
             // 重複を削除する
-            if (idList.indexOf(item.wikidata_id) === index) {
+            if (idList.indexOf(item["wikidata_id"]) === index) {
               return item;
             }
           });
@@ -1088,22 +1088,22 @@
         //文章の組み立て
         let LOG = new Array();
         for (let i = 0; i < tokens.length; i++) {
-          let judge0;
-          let judge;
+          let isCompoundWordPositionOverlap;
+          let isWordPositionOverlap;
           if (fukugou_linked_string != null) {
-            judge0 = fukugou_linked_string.some(
+            isCompoundWordPositionOverlap = fukugou_linked_string.some(
               (data) => data.word_position == tokens[i].word_position
             );
           }
           //used linked_string
           if (linked_string != null) {
             //used linked_string
-            judge = linked_string.some(
+            isWordPositionOverlap = linked_string.some(
               (data) => data.word_position == tokens[i].word_position
             );
           }
-          //console.log(judge0);
-          if (judge0 === true) {
+          //console.log(isCompoundWordPositionOverlap);
+          if (isCompoundWordPositionOverlap === true) {
             for (let j = 0; j < fukugou_linked_string.length; j++) {
               if (
                 fukugou_linked_string[j].word_position ==
@@ -1120,7 +1120,7 @@
                 break;
               }
             }
-          } else if (judge === true) {
+          } else if (isWordPositionOverlap === true) {
             //console.log(tokens[i].surface_form)
             //used linked_string
             for (let j = 0; j < linked_string.length; j++) {
@@ -1141,7 +1141,7 @@
                 break;
               }
             }
-          } else if (judge == false) {
+          } else if (isWordPositionOverlap == false) {
             textOUTPUT += tokens[i].surface_form;
           }
         }
