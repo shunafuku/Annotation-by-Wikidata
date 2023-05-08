@@ -946,22 +946,24 @@
           }
           //console.log(fukugou_linked_string);
         }
-        //--------------------------------------------END 複合語検索--------------------------------------------------------------------------------------
+        //--------------------------------END 複合語検索--------------------------------
+        
         //リンクテキスト
         //used linked_string
+        //--------------------------------START リンキングテキスト作成--------------------------------
         let linked_string = new Array();
         for (let i = 0; i < words.length; i++) {
-          let isCompoundWordPositionOverlap = false;
+          let isOverlapWithCompoundWordPosition = false;
           if (fukugou_linked_string != null) {
-            isCompoundWordPositionOverlap = fukugou_linked_string.some(
+            isOverlapWithCompoundWordPosition = fukugou_linked_string.some(
               (data) => data.word_position == words[i].word_position
             );
           }
-          if (isCompoundWordPositionOverlap) {
-            let index = fukugou_linked_string.findIndex(
+          if (isOverlapWithCompoundWordPosition) {
+            let indexOfStartOverlap = fukugou_linked_string.findIndex(
               ({ word_position }) => word_position == words[i].word_position
             );
-            i += fukugou_linked_string[index].word_count - 1;
+            i += fukugou_linked_string[indexOfStartOverlap].word_count - 1;
           } else {
             //検索対象のwikidataid
             let wikidata_ids = "";
@@ -1088,10 +1090,10 @@
         //文章の組み立て
         let LOG = new Array();
         for (let i = 0; i < tokens.length; i++) {
-          let isCompoundWordPositionOverlap;
+          let isOverlapWithCompoundWordPosition;
           let isWordPositionOverlap;
           if (fukugou_linked_string != null) {
-            isCompoundWordPositionOverlap = fukugou_linked_string.some(
+            isOverlapWithCompoundWordPosition = fukugou_linked_string.some(
               (data) => data.word_position == tokens[i].word_position
             );
           }
@@ -1102,8 +1104,8 @@
               (data) => data.word_position == tokens[i].word_position
             );
           }
-          //console.log(isCompoundWordPositionOverlap);
-          if (isCompoundWordPositionOverlap === true) {
+          //console.log(isOverlapWithCompoundWordPosition);
+          if (isOverlapWithCompoundWordPosition === true) {
             for (let j = 0; j < fukugou_linked_string.length; j++) {
               if (
                 fukugou_linked_string[j].word_position ==
