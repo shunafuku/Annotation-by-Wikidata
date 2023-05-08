@@ -950,7 +950,7 @@
         
         //リンクテキスト
         //used linked_string
-        //--------------------------------START リンキングテキスト作成--------------------------------
+        //--------------------------------START 各単語のAPI問い合わせ--------------------------------
         let linked_string = new Array();
         for (let i = 0; i < words.length; i++) {
           let isOverlapWithCompoundWordPosition = false;
@@ -1054,16 +1054,17 @@
             }
           }
         }
+        //--------------------------------END 各単語のAPI問い合わせ--------------------------------
         console.log("wikidata検索結果", wikidata_log);
         console.log("SPARQL検索結果", SPARQL_log);
 
         //重複の削除
         if (fukugou_linked_string != null) {
           const result = fukugou_linked_string.filter((item, index, self) => {
-            // name だけをリスト化する
+            // itemからwikidata_idだけを抜き出したリストを作成する
             const idList = self.map((item) => item["wikidata_id"]);
             // 重複を削除する
-            if (idList.indexOf(item.wikidata_id) === index) {
+            if (idList.indexOf(item["wikidata_id"]) === index) {
               return item;
             }
           });
@@ -1073,13 +1074,14 @@
         //used linked_string
         if (linked_string != null) {
           //used linked_string
+          // 重複を削除する
           const result = linked_string.filter((item, index, self) => {
             // id だけをリスト化する
             const idList = self.map((item) => item["wikidata_id"]);
             //console.log(item.wikidata_id);
-            // 重複を削除する
+            
             if (idList.indexOf(item["wikidata_id"]) === index) {
-              return item;
+              return true;
             }
           });
           //console.log(result);
